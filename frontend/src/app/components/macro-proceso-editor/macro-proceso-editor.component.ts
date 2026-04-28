@@ -236,7 +236,7 @@ export class MacroProcesoEditorComponent implements OnInit {
   macroProcesos: any[] = [];
   politicaSeleccionada?: PoliticaNegocio;
 
-  private apiUrl = 'http://localhost:8080/api/macroprocesos';
+  private apiUrl = 'http://13.217.197.171:8080/api/macroprocesos';
 
   constructor(
     private bpmsService: BpmsService, 

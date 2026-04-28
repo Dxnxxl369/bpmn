@@ -20,8 +20,8 @@ export interface UserProfile {
 export class AuthService {
   private userSubject = new BehaviorSubject<UserProfile | null>(null);
   user$ = this.userSubject.asObservable();
-  private apiUrl = 'http://localhost:8080/api/auth';
-  private usrUrl = 'http://localhost:8080/api/usuarios';
+  private apiUrl = 'http://13.217.197.171:8080/api/auth';
+  private usrUrl = 'http://13.217.197.171:8080/api/usuarios';
 
   constructor(private router: Router, private http: HttpClient) {
     this.restoreSession();

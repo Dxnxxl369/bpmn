@@ -250,7 +250,7 @@ export class FuncionarioMonitorComponent implements OnInit, OnDestroy {
 
   inicializarWebSocket() {
     this.rxStomp.configure({
-      webSocketFactory: () => new SockJSClass('http://localhost:8080/ws-bpms'),
+      webSocketFactory: () => new SockJSClass('http://13.217.197.171:8080/ws-bpms'),
       reconnectDelay: 5000
     });
     this.rxStomp.activate();

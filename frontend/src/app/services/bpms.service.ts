@@ -28,10 +28,10 @@ export interface Departamento {
   providedIn: 'root'
 })
 export class BpmsService {
-  private apiUrl = 'http://localhost:8080/api/politicas';
-  private usrUrl = 'http://localhost:8080/api/usuarios';
-  private deptUrl = 'http://localhost:8080/api/departamentos';
-  private apiUrlForm = 'http://localhost:8080/api/formulario';
+  private apiUrl = 'http://13.217.197.171:8080/api/politicas';
+  private usrUrl = 'http://13.217.197.171:8080/api/usuarios';
+  private deptUrl = 'http://13.217.197.171:8080/api/departamentos';
+  private apiUrlForm = 'http://13.217.197.171:8080/api/formulario';
 
   constructor(private http: HttpClient) {}
 
@@ -102,29 +102,29 @@ export class BpmsService {
   }
 
   getTareasPendientes(laneId: string | string[]): Observable<any[]> {
-    return this.http.get<any[]>(`http://localhost:8080/api/instancias/tareas/pendientes`, {
+    return this.http.get<any[]>(`http://13.217.197.171:8080/api/instancias/tareas/pendientes`, {
       params: { laneId }
     });
   }
 
   getTareasEnProceso(laneId: string | string[]): Observable<any[]> {
-    return this.http.get<any[]>(`http://localhost:8080/api/instancias/tareas/en-proceso`, {
+    return this.http.get<any[]>(`http://13.217.197.171:8080/api/instancias/tareas/en-proceso`, {
       params: { laneId }
     });
   }
 
   getTareasCompletadas(laneId: string | string[]): Observable<any[]> {
-    return this.http.get<any[]>(`http://localhost:8080/api/instancias/tareas/completadas`, {
+    return this.http.get<any[]>(`http://13.217.197.171:8080/api/instancias/tareas/completadas`, {
       params: { laneId }
     });
   }
 
   completarTarea(tareaId: string, respuestas: any): Observable<any> {
-    return this.http.post(`http://localhost:8080/api/instancias/tareas/${tareaId}/completar`, respuestas);
+    return this.http.post(`http://13.217.197.171:8080/api/instancias/tareas/${tareaId}/completar`, respuestas);
   }
 
   atenderTarea(tareaId: string, userEmail: string): Observable<any> {
-    return this.http.post(`http://localhost:8080/api/instancias/tareas/${tareaId}/atender`, null, {
+    return this.http.post(`http://13.217.197.171:8080/api/instancias/tareas/${tareaId}/atender`, null, {
       params: { userEmail }
     });
   }
@@ -159,7 +159,7 @@ export class BpmsService {
   }
 
   iniciarTramitePresencial(politicaId: string, respuestas: string, userEmail?: string): Observable<any> {
-    return this.http.post(`http://localhost:8080/api/instancias/iniciar-presencial`, { politicaId, respuestas, userEmail });
+    return this.http.post(`http://13.217.197.171:8080/api/instancias/iniciar-presencial`, { politicaId, respuestas, userEmail });
   }
 
   listarVersiones(id: string): Observable<any[]> {
@@ -171,6 +171,6 @@ export class BpmsService {
   }
 
   getInstanciaDetalle(instanciaId: string): Observable<any> {
-    return this.http.get<any>(`http://localhost:8080/api/instancias/${instanciaId}`);
+    return this.http.get<any>(`http://13.217.197.171:8080/api/instancias/${instanciaId}`);
   }
 }

@@ -77,7 +77,7 @@ export class GlobalAnalyticsComponent implements OnInit {
   }
 
   cargarDatos() {
-    this.http.get<any>('http://localhost:8080/api/analiticas/global').subscribe({
+    this.http.get<any>('http://13.217.197.171:8080/api/analiticas/global').subscribe({
       next: (res) => {
         this.stats.totalTareas = res.totalTareas;
         this.stats.cuelloCritico = res.cuelloCritico;

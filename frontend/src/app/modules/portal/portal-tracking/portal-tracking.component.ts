@@ -149,7 +149,7 @@ export class PortalTrackingComponent implements OnInit {
   }
 
   cargarSeguimiento() {
-    this.http.get<any>(`http://localhost:8080/api/public/seguimiento/${this.token}`).subscribe({
+    this.http.get<any>(`http://13.217.197.171:8080/api/public/seguimiento/${this.token}`).subscribe({
       next: (res) => {
         this.data = res;
         this.loading = false;
