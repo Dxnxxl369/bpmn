@@ -1,0 +1,56 @@
+<div class="editor-container">
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>Diseñador de Macro-Procesos</mat-card-title>
+      <mat-card-subtitle>Encadena múltiples trámites en una secuencia lógica</mat-card-subtitle>
+    </mat-card-header>
+    
+    <mat-card-content>
+      <div class="form-row">
+        <mat-form-field appearance="outline">
+          <mat-label>Nombre del Macro-Proceso</mat-label>
+          <input matInput [(ngModel)]="nombre" placeholder="Ej: Apertura de Cuenta Completa">
+        </mat-form-field>
+      </div>
+
+      <div class="setup-row">
+        <mat-form-field appearance="outline">
+          <mat-label>Seleccionar Trámite/Política</mat-label>
+          <mat-select [(ngModel)]="politicaSeleccionada">
+            <mat-option *ngFor="let p of politicas" [value]="p">{{ p.nombre }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <button mat-raised-button color="accent" (click)="agregarPaso()" [disabled]="!politicaSeleccionada">
+          <mat-icon>add</mat-icon> Agregar al flujo
+        </button>
+      </div>
+
+      <div class="flow-visualization" *ngIf="pasos.length > 0">
+        <h3>Secuencia de Ejecución</h3>
+        <div class="steps-list">
+          <div *ngFor="let p of pasos; let i = index" class="step-item">
+            <div class="step-number">{{ i + 1 }}</div>
+            <div class="step-content">
+              <strong>{{ p.nombre }}</strong>
+              <small>{{ p.descripcion }}</small>
+            </div>
+            <div class="step-actions">
+              <button mat-icon-button (click)="subirPaso(i)" [disabled]="i === 0"><mat-icon>arrow_upward</mat-icon></button>
+              <button mat-icon-button (click)="bajarPaso(i)" [disabled]="i === pasos.length - 1"><mat-icon>arrow_downward</mat-icon></button>
+              <button mat-icon-button color="warn" (click)="quitarPaso(i)"><mat-icon>delete</mat-icon></button>
+            </div>
+            <div class="connector" *ngIf="i < pasos.length - 1">
+              <mat-icon>arrow_downward</mat-icon>
+            </div>
+          </div>
+        </div>
+      </div>
+    </mat-card-content>
+
+    <mat-card-actions align="end">
+      <button mat-raised-button color="primary" (click)="guardar()" [disabled]="!nombre || pasos.length === 0">
+        <mat-icon>save</mat-icon> Guardar Macro-Proceso
+      </button>
+    </mat-card-actions>
+  </mat-card>
+</div>

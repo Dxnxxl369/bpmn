@@ -1,0 +1,56 @@
+<div class="casting-container animate-fade-in">
+    <header class="page-header">
+      <div class="badge-premium">GOVERNANCE & ROLES</div>
+      <h1>Casting de <span>Ejecutivos</span></h1>
+      <p class="text-muted">Asigna la responsabilidad de uno o varios departamentos a tu personal humano.</p>
+    </header>
+
+    <div class="grid-container">
+      <mat-card *ngFor="let exec of ejecutivos" class="exec-card glass-panel">
+        <div class="card-header">
+          <div class="avatar-orb">
+            {{ exec.nombre.charAt(0).toUpperCase() }}
+            <div class="orb-glow"></div>
+          </div>
+          <div class="title-group">
+            <h3>{{ exec.nombre }}</h3>
+            <span class="email-badge">{{ exec.email }}</span>
+          </div>
+        </div>
+        
+        <div class="card-body">
+          <div class="assigned-preview">
+            <span class="label">RESPONSABILIDADES ACTUALES:</span>
+            <div class="dept-tags-container">
+              <span class="dept-tag" *ngFor="let deptId of exec.departamentoIds">
+                {{ (departamentos | filterById:deptId)?.nombreNormalizado || 'Depto' }}
+              </span>
+              <span class="no-depts" *ngIf="!exec.departamentoIds || exec.departamentoIds.length === 0">Sin departamentos asignados</span>
+            </div>
+          </div>
+
+          <mat-form-field appearance="outline" class="full-width premium-select">
+            <mat-label>Gestionar Departamentos</mat-label>
+            <mat-select [(ngModel)]="exec.departamentoIds" multiple (selectionChange)="asignar(exec)">
+              <mat-select-trigger>
+                {{ exec.departamentoIds ? exec.departamentoIds.length : 0 }} deptos. seleccionados
+              </mat-select-trigger>
+              <mat-option *ngFor="let dept of departamentos" [value]="dept.id">
+                <div class="option-content">
+                  <mat-icon>domain</mat-icon>
+                  <span>{{ dept.nombreNormalizado }}</span>
+                </div>
+              </mat-option>
+            </mat-select>
+            <mat-hint>Puedes seleccionar múltiples opciones</mat-hint>
+          </mat-form-field>
+        </div>
+      </mat-card>
+    </div>
+
+    <div class="empty-state" *ngIf="ejecutivos.length === 0">
+      <mat-icon>group_off</mat-icon>
+      <h3>No hay ejecutivos registrados</h3>
+      <p>Asegúrate de que el personal tenga el rol 'FUNCIONARIO' en la base de datos.</p>
+    </div>
+  </div>

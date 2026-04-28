@@ -1,0 +1,81 @@
+<div class="portal-body" [class.dark-mode]="isDarkMode">
+  <div class="catalog-container animate-hero">
+    <header class="catalog-hero">
+      <div class="online-badge">PLATAFORMA CIUDADANA UAGRM</div>
+      <h1 class="hero-title">Servicios en <span>Línea</span></h1>
+      <p class="subtitle">
+        Trámites digitalizados y orquestados por IA para tu comodidad.
+      </p>
+      
+      <div class="search-box glass-panel">
+        <mat-icon>search</mat-icon>
+        <input type="text" placeholder="¿Qué trámite buscas? (Ej: Medidor, Reclamo...)" [(ngModel)]="busqueda" (input)="filtrar()">
+      </div>
+    </header>
+
+    <!-- GRILLA DE SERVICIOS (SOLO PUBLICADOS) -->
+    <div class="services-grid">
+      <mat-card *ngFor="let s of serviciosFiltrados" class="service-card-modern glass-panel animate-fade-in">
+        <div class="card-icon-orb"><mat-icon>assignment</mat-icon></div>
+        <h3 class="card-title">{{ s.nombre }}</h3>
+        <p class="card-desc">{{ s.descripcion || 'Trámite digitalizado disponible para inicio inmediato.' }}</p>
+        <div class="spacer"></div>
+        <button class="btn-init" (click)="abrirDialogoInicio(s)">
+          INICIAR TRÁMITE <mat-icon>arrow_forward</mat-icon>
+        </button>
+      </mat-card>
+    </div>
+
+    <!-- ESTADO VACÍO -->
+    <div class="empty-portal" *ngIf="serviciosFiltrados.length === 0">
+       <mat-icon>inventory_2</mat-icon>
+       <p>No hay servicios disponibles en este momento.</p>
+    </div>
+
+    <!-- MODAL DE INICIO INTELIGENTE -->
+    <ng-template #dialogInicio>
+      <div class="dialog-modern-portal" [class.dark-dialog]="isDarkMode">
+        <header class="dialog-head">
+          <div class="head-top">
+            <span class="step-badge">PASO 1 DE 1</span>
+            <button mat-icon-button mat-dialog-close><mat-icon>close</mat-icon></button>
+          </div>
+          <h2>Solicitud de <span>{{ servicioSeleccionado?.nombre }}</span></h2>
+          <p>Completa el formulario oficial para procesar tu solicitud.</p>
+        </header>
+        
+        <div class="dialog-body-scroll scroll-custom">
+          <!-- CARGA DEL FORMULARIO DINÁMICO DISEÑADO PARA CLIENTE -->
+          <app-formulario-dinamico 
+            *ngIf="schemaCliente"
+            [schema]="schemaCliente" 
+            (submitted)="confirmarInicio($event)">
+          </app-formulario-dinamico>
+          
+          <div class="loading-form-ia" *ngIf="!schemaCliente && !errorCarga">
+             <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+             <p>Cargando formulario oficial...</p>
+          </div>
+          
+          <div class="error-msg" *ngIf="errorCarga">
+             <mat-icon>warning</mat-icon>
+             <p>Este trámite no tiene un formulario de cliente configurado.</p>
+          </div>
+        </div>
+      </div>
+    </ng-template>
+
+    <!-- RASTREO RÁPIDO -->
+    <section class="quick-track-modern glass-panel">
+      <div class="track-icon-box"><mat-icon>qr_code_scanner</mat-icon></div>
+      <div class="track-info">
+        <h3>¿Ya tienes un trámite en curso?</h3>
+        <p>Ingresa tu código de seguimiento para ver el avance en tiempo real.</p>
+      </div>
+      <div class="track-input">
+        <input type="text" placeholder="Ej: 372b57..." [(ngModel)]="tokenBusqueda">
+        <button (click)="irASeguimiento()" [disabled]="!tokenBusqueda">RASTREAR</button>
+      </div>
+    </section>
+  </div>
+</div>

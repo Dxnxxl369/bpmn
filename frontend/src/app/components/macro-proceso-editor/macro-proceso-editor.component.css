@@ -1,0 +1,31 @@
+.editor-container { padding: 20px; max-width: 800px; margin: 0 auto; }
+.form-row { margin-bottom: 20px; }
+.form-row mat-form-field { width: 100%; }
+.setup-row { display: flex; gap: 15px; align-items: center; margin-bottom: 30px; }
+.setup-row mat-form-field { flex: 1; margin-bottom: 0; }
+
+.flow-visualization { background: #f9f9f9; padding: 20px; border-radius: 8px; border: 1px dashed #ccc; }
+.steps-list { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+
+.step-item {
+  width: 100%; display: flex; align-items: center; gap: 15px; background: white;
+  padding: 15px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  position: relative;
+}
+
+.step-number {
+  background: #3f51b5; color: white; width: 28px; height: 28px;
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-weight: bold; font-size: 14px;
+}
+
+.step-content { flex: 1; display: flex; flex-direction: column; }
+.step-content strong { color: #333; }
+.step-content small { color: #888; }
+
+.step-actions { display: flex; gap: 5px; }
+
+.connector {
+  position: absolute; bottom: -25px; left: 24px; color: #3f51b5;
+  z-index: 2; height: 20px; display: flex; align-items: center;
+}

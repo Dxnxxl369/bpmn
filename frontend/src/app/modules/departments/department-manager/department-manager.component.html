@@ -1,0 +1,53 @@
+<div class="dept-container animate-fade-in">
+  <header class="page-header">
+    <div class="badge-premium">DICCIONARIO DE IA</div>
+    <h1>Diccionario de <span>Departamentos</span></h1>
+    <p>Unifica los carriles detectados por la IA en departamentos reales del organigrama.</p>
+    
+    <div class="header-actions">
+      <button mat-raised-button class="sync-all-btn" (click)="resincronizarTodo()" [disabled]="sincronizando">
+        <mat-icon [class.anim-rotate]="sincronizando">{{ sincronizando ? 'sync' : 'auto_awesome' }}</mat-icon> 
+        {{ sincronizando ? 'SINCRONIZANDO...' : 'ESCANEAR POLÍTICAS ACTIVAS' }}
+      </button>
+    </div>
+  </header>
+
+  <div class="grid-container" *ngIf="departamentos.length > 0">
+    <mat-card *ngFor="let dept of departamentos" class="dept-card glass-panel">
+      <div class="card-header">
+        <div class="icon-orb"><mat-icon>domain</mat-icon></div>
+        <div class="title-group">
+          <h3>{{ dept.nombreOriginal }}</h3>
+          <span class="badge">DETECTADO EN BPMN</span>
+        </div>
+      </div>
+      
+      <div class="card-body">
+        <mat-form-field appearance="outline" class="full-width premium-field">
+          <mat-label>Nombre Oficial (Normalizado)</mat-label>
+          <input matInput [(ngModel)]="dept.nombreNormalizado" placeholder="Ej: Departamento de Contabilidad">
+          <mat-icon matSuffix color="primary">edit</mat-icon>
+        </mat-form-field>
+      </div>
+      
+      <div class="card-actions">
+        <button mat-raised-button class="save-btn" (click)="guardar(dept)">
+          <mat-icon>save</mat-icon> GUARDAR CAMBIOS
+        </button>
+      </div>
+    </mat-card>
+  </div>
+  
+  <div class="empty-state" *ngIf="departamentos.length === 0 && !sincronizando">
+    <div class="empty-orb"><mat-icon>info</mat-icon></div>
+    <h3>Sin Departamentos Detectados</h3>
+    <p>No se han encontrado carriles en las políticas publicadas. Certifica un diagrama primero.</p>
+    <button mat-stroked-button (click)="resincronizarTodo()">REINTENTAR ESCANEO</button>
+  </div>
+
+  <!-- LOADER DE CARGA -->
+  <div class="loading-overlay" *ngIf="sincronizando">
+     <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+     <p>La IA está analizando los diagramas publicados...</p>
+  </div>
+</div>

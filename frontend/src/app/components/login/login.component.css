@@ -1,0 +1,57 @@
+.login-scene { 
+      height: 100vh; width: 100vw; display: flex; justify-content: center; align-items: center; 
+      background: #f8fafc; position: relative; overflow: hidden; transition: 0.5s;
+    }
+    body.dark-mode .login-scene { background: #050505; }
+    
+    .theme-toggle {
+      position: absolute; top: 40px; right: 50px; width: 54px; height: 54px; border-radius: 50%;
+      border: 1px solid var(--glass-border); background: var(--surface);
+      color: var(--primary-color); cursor: pointer; z-index: 100;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .theme-toggle:hover { transform: rotate(45deg) scale(1.1); box-shadow: 0 0 20px var(--primary-color); }
+    .theme-toggle mat-icon { font-size: 28px; width: 28px; height: 28px; }
+
+    .bg-orb { position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.3; z-index: 0; }
+    .orb-1 { width: 400px; height: 400px; background: var(--primary-color); top: -100px; left: -100px; }
+    .orb-2 { width: 300px; height: 300px; background: #3b82f6; bottom: -50px; right: -50px; }
+
+    .login-box { width: 480px; padding: 60px; border-radius: 48px; text-align: center; position: relative; z-index: 10; border: 1px solid var(--glass-border); background: var(--surface); }
+    .logo-orb { width: 64px; height: 64px; background: var(--primary-color); color: white; border-radius: 22px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 24px; box-shadow: 0 15px 30px rgba(211, 84, 0, 0.4); }
+    h1 { font-size: 2.2rem; font-weight: 900; color: var(--text-main); margin: 0; letter-spacing: -1px; }
+    h1 span { color: var(--primary-color); }
+    p { color: var(--text-muted); margin-bottom: 40px; letter-spacing: 2px; text-transform: uppercase; font-size: 0.7rem; font-weight: 800; }
+
+    .login-form { display: flex; flex-direction: column; gap: 8px; }
+    .full-width { width: 100%; }
+
+    /* CORRECCIÓN DEFINITIVA DE TEXTO BLANCO (FORZADO) */
+    ::ng-deep .mat-mdc-form-field-flex { 
+      background: rgba(0, 0, 0, 0.04) !important; 
+      border-radius: 18px !important; 
+    }
+    ::ng-deep .mat-mdc-input-element { 
+      color: #000000 !important; /* NEGRO SÓLIDO EN CLARO */
+      font-weight: 700 !important; 
+    }
+    ::ng-deep .mat-mdc-form-field-label { color: #64748b !important; }
+
+    body.dark-mode ::ng-deep .mat-mdc-input-element { 
+      color: #ffffff !important; /* BLANCO PURO EN OSCURO */
+    }
+    body.dark-mode ::ng-deep .mat-mdc-form-field-flex { 
+      background: rgba(255, 255, 255, 0.08) !important; 
+    }
+
+    .submit-btn { 
+      background: linear-gradient(135deg, var(--primary-color), #e67e22) !important; 
+      color: white !important; height: 64px !important; border-radius: 20px !important; 
+      font-weight: 800 !important; margin-top: 20px !important;
+      box-shadow: 0 10px 25px rgba(211, 84, 0, 0.3) !important;
+    }
+
+    .portal-link-box { margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--glass-border); display: flex; flex-direction: column; gap: 10px; }
+    .portal-btn { color: var(--primary-color); text-decoration: none; font-weight: 800; font-size: 0.95rem; }
+    .legal { margin-top: 40px; font-size: 0.6rem; color: var(--text-muted); opacity: 0.6; font-weight: 700; }

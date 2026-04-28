@@ -1,0 +1,54 @@
+# === IGNORAR TODO POR DEFECTO ===
+/*
+
+# === EXCEPCIONES (LO QUE SÍ SUBIMOS) ===
+!/backend/
+!/frontend/
+!/.gitignore
+!/README.md
+
+# === REGLAS GLOBALES DE EXCLUSIÓN (LIMPIEZA) ===
+# Secretos y Llaves (CRÍTICO)
+serviceAccountKey.json
+.env
+*.pem
+
+# Dependencias
+node_modules/
+jspm_packages/
+
+# Salidas de compilación
+dist/
+target/
+out-tsc/
+bazel-out/
+build/
+bin/
+obj/
+
+# Temporales y Caché
+.angular/
+.sass-cache/
+.history/
+tmp/
+temp/
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.eslintcache
+
+# IDEs y Editores
+.idea/
+.vscode/
+.classpath
+.project
+.settings/
+*.sublime-workspace
+*.swp
+*.swo
+
+# Sistema
+.DS_Store
+Thumbs.db

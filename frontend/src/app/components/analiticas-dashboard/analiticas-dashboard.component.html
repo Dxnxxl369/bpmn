@@ -1,0 +1,81 @@
+<div class="dashboard-container animate-fade-up">
+  
+  <div class="grid">
+    <!-- CUELLOS DE BOTELLA POR DEPARTAMENTO -->
+    <mat-card class="chart-card glass-panel">
+      <mat-card-header>
+        <mat-card-title>
+          <mat-icon color="primary">hub</mat-icon> 
+          Análisis de Cuellos de Botella (Espera vs Trabajo)
+        </mat-card-title>
+        <mat-card-subtitle>Detecta qué departamento está reteniendo los trámites</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div id="chart">
+          <apx-chart
+            [series]="deptoChartOptions.series!"
+            [chart]="deptoChartOptions.chart!"
+            [dataLabels]="deptoChartOptions.dataLabels!"
+            [plotOptions]="deptoChartOptions.plotOptions!"
+            [xaxis]="deptoChartOptions.xaxis!"
+            [fill]="deptoChartOptions.fill!"
+            [legend]="deptoChartOptions.legend!"
+            [theme]="deptoChartOptions.theme!"
+          ></apx-chart>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- RANKING DE EFICIENCIA -->
+    <mat-card class="chart-card glass-panel">
+      <mat-card-header>
+        <mat-card-title>
+          <mat-icon color="accent">leaderboard</mat-icon> 
+          Ranking de Eficiencia por Ejecutivo
+        </mat-card-title>
+        <mat-card-subtitle>Basado en el tiempo real de despacho de formularios</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div id="ranking-chart" *ngIf="ranking.length > 0">
+          <apx-chart
+            [series]="rankingChartOptions.series!"
+            [chart]="rankingChartOptions.chart!"
+            [dataLabels]="rankingChartOptions.dataLabels!"
+            [plotOptions]="rankingChartOptions.plotOptions!"
+            [xaxis]="rankingChartOptions.xaxis!"
+            [theme]="rankingChartOptions.theme!"
+          ></apx-chart>
+        </div>
+        <div class="empty-state" *ngIf="ranking.length === 0">
+           <mat-icon>leaderboard</mat-icon>
+           <p>No hay datos de ejecutivos para esta política aún.</p>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <!-- AUDITORÍA IA -->
+  <mat-card class="ia-card glass-panel highlight-border">
+    <mat-card-header>
+      <div class="ia-header-content">
+        <mat-icon class="ai-icon">psychology</mat-icon>
+        <div>
+          <mat-card-title>Auditoría de IA sobre Datos Reales</mat-card-title>
+          <mat-card-subtitle>La IA cruza los tiempos históricos con el diseño BPMN para sugerir mejoras</mat-card-subtitle>
+        </div>
+      </div>
+      <button mat-raised-button class="btn-ai-generate" (click)="generarAnalisisIA()" [disabled]="cargandoIA">
+        <mat-icon>{{ cargandoIA ? 'sync' : 'auto_awesome' }}</mat-icon>
+        {{ cargandoIA ? 'Analizando...' : 'Generar Reporte IA' }}
+      </button>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="reporte-content" *ngIf="reporteIA" [innerHTML]="reporteIA"></div>
+      <div class="placeholder-ai" *ngIf="!reporteIA && !cargandoIA">
+        <mat-icon>insights</mat-icon>
+        <p>Haz clic en "Generar Reporte IA" para obtener una auditoría detallada de eficiencia.</p>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+</div>

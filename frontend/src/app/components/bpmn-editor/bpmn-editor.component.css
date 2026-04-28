@@ -1,0 +1,30 @@
+.bpmn-wrapper { width: 100%; height: 100%; position: relative; background: #fff; display: flex; }
+    .canvas-container { flex: 1; height: 100%; }
+    
+    ::ng-deep .djs-palette { 
+      background: rgba(26, 26, 26, 0.9) !important; 
+      border: 1px solid rgba(255, 255, 255, 0.1) !important;
+      backdrop-filter: blur(10px);
+      border-radius: 12px !important;
+      left: 20px !important; top: 20px !important;
+      width: 48px !important;
+    }
+    ::ng-deep .djs-palette .entry { color: #fff !important; }
+    ::ng-deep .djs-palette .entry:hover { color: var(--primary-color) !important; }
+    ::ng-deep .bjs-powered-by { display: none !important; }
+
+    /* DESAPARICIÓN TOTAL DE BORDES */
+    ::ng-deep .djs-outline { stroke: transparent !important; fill: transparent !important; opacity: 0 !important; transition: opacity 0.1s ease; }
+    ::ng-deep .djs-element:hover .djs-outline,
+    ::ng-deep .djs-element.selected .djs-outline { opacity: 1 !important; stroke: var(--primary-color) !important; stroke-opacity: 0.2 !important; }
+    ::ng-deep .djs-hit, ::ng-deep .djs-hit-all, ::ng-deep .djs-resizer-hit { opacity: 0 !important; stroke: none !important; }
+    ::ng-deep .djs-visual path { stroke-width: 2.5px !important; }
+
+    /* FORZAR TEXTO OSCURO EN EL DIAGRAMA (INMUNE A MODO OSCURO) */
+    ::ng-deep .djs-container svg text {
+      fill: #2c3e50 !important;
+      font-weight: 600 !important;
+    }
+    ::ng-deep .djs-label {
+      fill: #2c3e50 !important;
+    }

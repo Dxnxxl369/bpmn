@@ -1,0 +1,88 @@
+<div class="ai-assistant-wrapper">
+      <div class="ai-bubble-container" 
+           cdkDrag 
+           (cdkDragEnded)="handleDragEnd($event)"
+           [cdkDragFreeDragPosition]="bubblePosition">
+        
+        <div class="ai-orb" (click)="toggleChat($event)" 
+             cdkDragHandle
+             [matTooltip]="isOpen ? '' : 'Asistente Inteligente'"
+             [class.active]="isOpen">
+          <div class="orb-content">
+            <mat-icon *ngIf="!isOpen">smart_toy</mat-icon>
+            <mat-icon *ngIf="isOpen">close</mat-icon>
+          </div>
+          <div class="pulse-animation" *ngIf="!isOpen"></div>
+        </div>
+
+        <div class="chat-window glass-panel animate-pop-in" 
+             *ngIf="isOpen" 
+             [ngClass]="isAtLeft ? 'side-right' : 'side-left'"
+             [style.top.px]="chatTopOffset">
+          
+          <header class="chat-header" [ngClass]="selectedMode">
+            <div class="header-top">
+              <div class="ai-status">
+                <span class="dot"></span>
+                <span>AI ONLINE</span>
+              </div>
+
+              <!-- SELECTOR DE ESTILO -->
+              <div class="style-selector">
+                <button [class.active]="selectedStyle === 'breve'" (click)="selectedStyle = 'breve'; cdr.detectChanges()" matTooltip="⚡ Respuesta rapida">⚡</button>
+                <button [class.active]="selectedStyle === 'profundo'" (click)="selectedStyle = 'profundo'; cdr.detectChanges()" matTooltip="🧠 Analisis detallado">🧠</button>
+              </div>
+
+              <div class="mode-selector">
+                <div class="mode-chip" [class.active]="selectedMode === 'guia'" (click)="setMode('guia')">
+                  <mat-icon>school</mat-icon> GUIA
+                </div>
+                <div class="mode-chip" [class.active]="selectedMode === 'diseno'" (click)="setMode('diseno')">
+                  <mat-icon>architecture</mat-icon> DISENO
+                </div>
+              </div>
+            </div>
+            <div class="header-info">
+              <h4>Orquestador IA</h4>
+              <p>{{ contextName }}</p>
+            </div>
+          </header>
+
+          <main class="chat-messages scroll-custom-mini">
+            <div class="msg-group" *ngFor="let m of messages" [ngClass]="m.role">
+              <div class="avatar" *ngIf="m.role === 'assistant'">
+                <mat-icon>android</mat-icon>
+              </div>
+              <div class="msg-bubble">
+                <p>{{ m.content }}</p>
+                <button class="action-btn-chat" *ngIf="m.schemaAction" (click)="aplicarSugerencia(m.schemaAction)">
+                  <mat-icon>auto_awesome</mat-icon> APLICAR DISENO IA
+                </button>
+                <span class="time">{{ m.time | date:'HH:mm' }}</span>
+              </div>
+            </div>
+            <div class="typing-indicator" *ngIf="isTyping">
+              <span></span><span></span><span></span>
+            </div>
+          </main>
+
+          <footer class="chat-footer">
+            <div class="input-wrapper-pro" [class.is-listening]="isListening">
+              <button class="mic-btn-premium" 
+                      [class.listening]="isListening"
+                      (click)="toggleListening()"
+                      type="button"
+                      matTooltip="Dictar comando por voz">
+                <mat-icon>{{ isListening ? 'mic' : 'mic' }}</mat-icon>
+              </button>
+              <input type="text" [(ngModel)]="currentInput" 
+                     (keyup.enter)="sendMessage()"
+                     placeholder="{{ isListening ? 'Escuchando...' : 'Preguntame lo que sea...' }}">
+              <button class="send-btn-premium" (click)="sendMessage()" [disabled]="!currentInput || isTyping">
+                <mat-icon>send</mat-icon>
+              </button>
+            </div>
+          </footer>
+        </div>
+      </div>
+    </div>

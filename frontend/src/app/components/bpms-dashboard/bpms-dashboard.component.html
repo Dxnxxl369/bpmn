@@ -1,0 +1,65 @@
+<div class="dashboard-container">
+  <mat-card class="ingestion-card">
+    <mat-card-header>
+      <mat-card-title>Plataforma Inteligente: Ingesta de Trámites</mat-card-title>
+    </mat-card-header>
+    
+    <mat-card-content>
+      <div class="ingestion-grid">
+        <!-- Subir PDF -->
+        <div class="ingestion-item">
+          <input type="file" #fileInput hidden (change)="onFileSelected($event)" accept="application/pdf">
+          <button mat-raised-button color="accent" (click)="fileInput.click()">
+            <mat-icon>upload_file</mat-icon> Subir Manual (PDF)
+          </button>
+        </div>
+
+        <!-- Dictado por Voz -->
+        <div class="ingestion-item">
+          <button mat-raised-button [color]="estaGrabandoVoz ? 'warn' : 'primary'" (click)="grabarVoz()">
+            <mat-icon>{{ estaGrabandoVoz ? 'mic' : 'mic_none' }}</mat-icon>
+            {{ estaGrabandoVoz ? 'Escuchando...' : 'Grabar Voz' }}
+          </button>
+        </div>
+
+        <!-- Cargar Borradores (Opción B) -->
+        <div class="ingestion-item">
+          <button mat-raised-button color="info" (click)="cargarBorradores()" style="background-color: #00bcd4; color: white;">
+            <mat-icon>folder_open</mat-icon> Cargar Mis Borradores
+          </button>
+        </div>
+      </div>
+
+      <!-- Texto Manual -->
+      <mat-form-field class="full-width" appearance="outline">
+        <mat-label>Descripción Manual del Proceso</mat-label>
+        <textarea matInput [(ngModel)]="textoManual" rows="4" placeholder="Ej: Primero el cliente solicita el crédito..."></textarea>
+      </mat-form-field>
+
+      <div class="ia-action-container">
+        <!-- Barra de progreso con porcentaje (Heurística #1) -->
+        <div *ngIf="procesandoIA" class="progress-container">
+          <mat-progress-bar mode="determinate" [value]="progresoIA"></mat-progress-bar>
+          <small class="progress-label">{{ progresoIA | number:'1.0-0' }}% completado - Llama 3 está modelando...</small>
+        </div>
+
+        <button mat-raised-button 
+                color="primary" 
+                (click)="procesarTexto()" 
+                [disabled]="procesandoIA || !textoManual.trim()"
+                class="full-width-btn">
+          <mat-icon *ngIf="!procesandoIA">psychology</mat-icon>
+          <mat-spinner *ngIf="procesandoIA" diameter="20" class="btn-spinner"></mat-spinner>
+          {{ procesandoIA ? 'Generando diagramas, por favor espere...' : 'Procesar Texto con IA' }}
+        </button>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Pestañas de Procesos Detectados -->
+  <mat-tab-group [(selectedIndex)]="selectedTabIndex" *ngIf="politicasGeneradas.length > 0">
+    <mat-tab *ngFor="let p of politicasGeneradas" [label]="p.nombre">
+      <app-bpmn-editor [politica]="p"></app-bpmn-editor>
+    </mat-tab>
+  </mat-tab-group>
+</div>

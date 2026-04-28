@@ -1,0 +1,22 @@
+<div class="confirm-simple-shell">
+  <div class="status-orb-container">
+    <div class="status-orb-v2" [class.is-warn]="data.icon === 'inventory_2'">
+      <mat-icon>{{ data.icon || 'help_outline' }}</mat-icon>
+    </div>
+  </div>
+
+  <h2 class="confirm-title">{{ data.title }}</h2>
+  <p class="confirm-text">{{ data.message }}</p>
+
+  <div class="confirm-footer">
+    <button class="btn-flat" (click)="dialogRef.close(false)">
+      CANCELAR
+    </button>
+    <button class="btn-action" 
+            [class.btn-warn]="data.icon === 'inventory_2'"
+            (click)="dialogRef.close(true)">
+      {{ data.confirmText || 'CONFIRMAR' }}
+      <mat-icon style="font-size: 18px; width: 18px; height: 18px; margin-left: 8px;">chevron_right</mat-icon>
+    </button>
+  </div>
+</div>

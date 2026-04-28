@@ -1,0 +1,46 @@
+<div class="confirm-simple-shell">
+      <div class="status-orb-container">
+        <div class="status-orb-v2">
+          <mat-icon>rocket_launch</mat-icon>
+        </div>
+      </div>
+      <h2 class="confirm-title">¡Proceso Certificado!</h2>
+      <p class="confirm-text">El diagrama ha sido publicado y ya está en producción.</p>
+      
+      <div class="sync-panel glass-panel">
+        <div class="sync-header">
+          <mat-icon>analytics</mat-icon>
+          <span>Resultados de Sincronización</span>
+        </div>
+        
+        <div class="stats-grid">
+          <div class="stat-item">
+            <span class="val">{{ data.report.total || 0 }}</span>
+            <span class="lab">Carriles Detectados</span>
+          </div>
+          <div class="stat-item highlight">
+            <span class="val">{{ data.report.creados || 0 }}</span>
+            <span class="lab">Nuevos Deptos.</span>
+          </div>
+          <div class="stat-item">
+            <span class="val">{{ data.report.vinculados || 0 }}</span>
+            <span class="lab">Existentes</span>
+          </div>
+        </div>
+
+        <div class="warning-box" *ngIf="data.report.hasSimilar">
+          <mat-icon>info</mat-icon>
+          <div>
+            <strong>Inteligencia Departamental Activa</strong>
+            <p>Se han vinculado carriles a departamentos existentes mediante similitud.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="confirm-footer">
+        <button class="btn-flat" (click)="dialogRef.close()">ENTENDIDO</button>
+        <button class="btn-action" routerLink="/admin/departments" (click)="dialogRef.close()">
+          DICCIONARIO <mat-icon>chevron_right</mat-icon>
+        </button>
+      </div>
+    </div>

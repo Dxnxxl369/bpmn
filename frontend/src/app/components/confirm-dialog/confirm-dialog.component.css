@@ -1,0 +1,67 @@
+.confirm-simple-shell { 
+  padding: 40px; 
+  text-align: center; 
+  background: var(--surface); 
+  border-radius: 28px;
+}
+
+.status-orb-container { display: flex; justify-content: center; margin-bottom: 25px; }
+
+.status-orb-v2 { 
+  width: 80px; height: 80px; 
+  background: linear-gradient(135deg, #d35400, #e67e22); 
+  color: #ffffff !important; 
+  border-radius: 24px; 
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 10px 25px rgba(211, 84, 0, 0.4);
+}
+.status-orb-v2 mat-icon { font-size: 45px; width: 45px; height: 45px; color: white !important; }
+.status-orb-v2.is-warn { background: linear-gradient(135deg, #c0392b, #e74c3c); }
+
+.confirm-title {
+  color: var(--text-main) !important;
+  font-size: 1.8rem;
+  font-weight: 900 !important;
+  margin: 0 0 15px;
+  letter-spacing: -1px;
+}
+
+.confirm-text {
+  color: var(--text-muted) !important;
+  font-size: 1rem;
+  line-height: 1.5;
+  margin: 0 0 35px;
+}
+
+.confirm-footer { display: flex; justify-content: center; gap: 15px; align-items: center; }
+
+.btn-flat {
+  background: transparent;
+  border: none;
+  color: var(--text-muted) !important;
+  font-weight: 800;
+  padding: 15px 25px;
+  cursor: pointer;
+  border-radius: 15px;
+  font-size: 0.95rem;
+}
+
+.btn-action {
+  background: linear-gradient(135deg, #d35400, #e67e22);
+  border: none;
+  color: white !important;
+  font-weight: 900;
+  padding: 15px 35px;
+  cursor: pointer;
+  border-radius: 18px;
+  font-size: 0.95rem;
+  box-shadow: 0 8px 20px rgba(211, 84, 0, 0.3);
+  display: flex; align-items: center; justify-content: center;
+  white-space: nowrap;
+}
+
+.btn-action.btn-warn { background: linear-gradient(135deg, #c0392b, #e74c3c); }
+
+body.dark-mode .confirm-simple-shell { background: #111; }
+body.dark-mode .confirm-title { color: white !important; }
+body.dark-mode .confirm-text { color: #94a3b8 !important; }

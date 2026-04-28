@@ -1,0 +1,113 @@
+<div [class.form-workspace]="data?.isDialog">
+  
+  <!-- BARRA LATERAL: PERFIL DEL CLIENTE (Solo en modo Diálogo de Atención) -->
+  <aside class="client-sidebar animate-fade-in" *ngIf="data?.isDialog && data?.instancia">
+    <div class="client-avatar-box">
+      <mat-icon>person</mat-icon>
+    </div>
+    
+    <div class="client-info-group">
+      <span class="client-label">Solicitante</span>
+      <p class="client-value">{{ data.instancia.solicitanteNombre }}</p>
+
+      <span class="client-label">Documento / CI</span>
+      <p class="client-value">{{ getContextValue('ci') || 'No registrado' }}</p>
+
+      <span class="client-label">Correo Electrónico</span>
+      <p class="client-value">{{ getContextValue('correo') || getContextValue('email') || 'No registrado' }}</p>
+
+      <span class="client-label">Contacto</span>
+      <p class="client-value">{{ getContextValue('telefono') || getContextValue('celular') || 'Sin contacto' }}</p>
+
+      <div class="token-tracking-badge">
+        <div class="tracking-dot" [class]="data.instancia.resultadoFinal"></div>
+        <div class="tracking-text">
+          <small>CÓDIGO SEGUIMIENTO</small>
+          <span>{{ data.instancia.codigoSeguimiento }}</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="dynamic-form-shell" [class.in-workspace]="data?.isDialog">
+    <header class="form-header">
+      <h2>Gestión de <span>Trámite</span></h2>
+      <p>Procesamiento digital de la solicitud.</p>
+    </header>
+
+      <form [formGroup]="form" (ngSubmit)="onSubmit()" class="dynamic-form">
+        <div *ngFor="let field of fields" 
+             class="field-container" 
+             [class.field-highlight]="highlightId === field.id"
+             (mouseenter)="fieldHovered.emit(field.id)"
+             (mouseleave)="fieldHovered.emit(null)">
+          
+          <ng-container [ngSwitch]="field.type">
+            
+            <mat-form-field *ngSwitchCase="'text'" appearance="outline" class="full-width premium-field">
+              <mat-label>{{ field.label }}</mat-label>
+              <input matInput [formControlName]="field.id" [required]="field.required">
+            </mat-form-field>
+
+            <mat-form-field *ngSwitchCase="'email'" appearance="outline" class="full-width premium-field">
+              <mat-label>{{ field.label }}</mat-label>
+              <input matInput type="email" [formControlName]="field.id" [required]="field.required" placeholder="ejemplo@correo.com">
+              <mat-icon matSuffix>email</mat-icon>
+            </mat-form-field>
+
+            <mat-form-field *ngSwitchCase="'textarea'" appearance="outline" class="full-width premium-field">
+              <mat-label>{{ field.label }}</mat-label>
+              <textarea matInput [formControlName]="field.id" [required]="field.required" rows="2"></textarea>
+            </mat-form-field>
+
+            <mat-form-field *ngSwitchCase="'number'" appearance="outline" class="full-width premium-field">
+              <mat-label>{{ field.label }}</mat-label>
+              <input matInput type="number" [formControlName]="field.id" [required]="field.required">
+            </mat-form-field>
+
+            <mat-form-field *ngSwitchCase="'date'" appearance="outline" class="full-width premium-field">
+              <mat-label>{{ field.label }}</mat-label>
+              <input matInput [matDatepicker]="picker" [formControlName]="field.id" (click)="picker.open()" readonly>
+              <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+              <mat-datepicker #picker></mat-datepicker>
+            </mat-form-field>
+
+            <mat-form-field *ngSwitchCase="'select'" appearance="outline" class="full-width premium-field">
+              <mat-label>{{ field.label }}</mat-label>
+              <mat-select [formControlName]="field.id">
+                <mat-option *ngFor="let opt of field.options" [value]="opt">{{ opt }}</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <div *ngSwitchCase="'file'" class="file-premium-container">
+              <label class="file-label">{{ field.label }} <span *ngIf="field.required" class="req">*</span></label>
+              <div class="file-input-wrapper">
+                <button type="button" class="btn-file-trigger" (click)="f.click()">
+                  <mat-icon>cloud_upload</mat-icon>
+                  {{ fileName[field.id] || 'Seleccionar Documento' }}
+                </button>
+                <input type="file" #f (change)="onFileChange($event, field.id)" hidden>
+              </div>
+            </div>
+
+            <div *ngSwitchCase="'button'" class="button-field-wrapper">
+               <button mat-raised-button class="btn-custom-action" type="button" (click)="onSubmit()">
+                 {{ field.label }}
+               </button>
+            </div>
+
+          </ng-container>
+        </div>
+
+        <div class="form-actions" *ngIf="fields.length > 0 && !hasCustomButtons()">
+          <button mat-raised-button class="btn-save-form" type="submit">
+            GUARDAR Y CONTINUAR <mat-icon>chevron_right</mat-icon>
+          </button>
+        </div>
+        
+        <div class="empty-preview" *ngIf="fields.length === 0">
+           <mat-icon>extension</mat-icon>
+           <p>Diseña los campos para ver el formulario</p>
+        </div>
+      </form>
+    </div>

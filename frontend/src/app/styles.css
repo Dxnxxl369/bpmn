@@ -1,0 +1,79 @@
+@import "@angular/material/prebuilt-themes/indigo-pink.css";
+
+:root {
+  --primary-color: #d35400; 
+  --primary-hover: #e67e22;
+  --secondary-color: #2c3e50;
+  --bg-app: #f4f6f8; 
+  --surface: #ffffff;
+  --text-main: #1e293b;
+  --text-muted: #64748b;
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --border-radius-lg: 32px;
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.05);
+  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body.dark-mode {
+  --bg-app: #050505;
+  --surface: #111111;
+  --text-main: #ffffff;
+  --text-muted: #94a3b8;
+  --glass-bg: rgba(25, 25, 25, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.1);
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  transition: background-color 0.4s ease;
+  overflow-x: hidden;
+}
+
+/* --- FIX CRÍTICO DE DIÁLOGOS (PUNTO 2) --- */
+.cdk-overlay-dark-backdrop { background: rgba(0,0,0,0.7) !important; backdrop-filter: blur(4px); }
+
+body.dark-mode .mat-mdc-dialog-container .mdc-dialog__content,
+body.dark-mode .mat-mdc-dialog-container .mdc-dialog__title,
+body.dark-mode .mat-mdc-dialog-container {
+  background-color: #1a1a1a !important;
+  color: white !important;
+}
+
+body.dark-mode .mat-mdc-form-field-label, 
+body.dark-mode .mat-mdc-input-element,
+body.dark-mode .mat-mdc-select-value {
+  color: white !important;
+}
+
+/* --- VISIBILIDAD DE TÍTULOS --- */
+h1, h2, h3, h4 { color: var(--text-main) !important; }
+
+/* --- ESTILO GLASSMISM PREMIUM --- */
+.glass-panel {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid var(--glass-border) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* --- REPOSITORIO Y TARJETAS --- */
+.repo-item, .service-card-modern {
+  background: var(--surface) !important;
+  color: var(--text-main) !important;
+  border: 1px solid var(--glass-border) !important;
+}
+
+/* --- ANIMACIONES --- */
+.animate-hero { animation: slideUp 0.8s var(--transition-smooth); }
+@keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+
+/* --- SCROLLBAR --- */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-app); }
+::-webkit-scrollbar-thumb { background: rgba(189, 195, 199, 0.4); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--primary-color); }

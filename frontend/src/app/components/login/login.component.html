@@ -1,0 +1,47 @@
+<div class="login-scene">
+      <!-- TOGGLE DE MODO (LUNA/SOL) -->
+      <button class="theme-toggle" (click)="toggleTheme()" [matTooltip]="isDarkMode ? 'Modo Claro' : 'Modo Oscuro'">
+        <mat-icon>{{ isDarkMode ? 'light_mode' : 'dark_mode' }}</mat-icon>
+      </button>
+
+      <!-- ORBES DE FONDO DINÁMICOS -->
+      <div class="bg-orb orb-1"></div>
+      <div class="bg-orb orb-2"></div>
+      
+      <div class="login-box glass-panel animate-hero">
+        <div class="header">
+          <div class="logo-orb"><mat-icon>terminal</mat-icon></div>
+          <h1>BPMS <span>ORCHESTRATOR</span></h1>
+          <p>Intelligence & Governance Platform</p>
+        </div>
+
+        <form (ngSubmit)="onSubmit()" class="login-form">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Email institucional</mat-label>
+            <input matInput type="email" [(ngModel)]="email" name="email" required placeholder="admin@test.com">
+            <mat-icon matPrefix>alternate_email</mat-icon>
+          </mat-form-field>
+          
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Contraseña</mat-label>
+            <input matInput [type]="hide ? 'password' : 'text'" [(ngModel)]="password" name="password" required>
+            <mat-icon matPrefix>lock</mat-icon>
+            <button type="button" mat-icon-button matSuffix (click)="hide = !hide">
+              <mat-icon>{{hide ? 'visibility_off' : 'visibility'}}</mat-icon>
+            </button>
+          </mat-form-field>
+
+          <button mat-raised-button class="submit-btn" type="submit">
+            ACCEDER AL PANEL
+            <mat-icon>arrow_forward</mat-icon>
+          </button>
+        </form>
+
+        <div class="portal-link-box">
+          <span>¿Eres un ciudadano?</span>
+          <a routerLink="/portal" class="portal-btn">Ir al Portal de Trámites</a>
+        </div>
+
+        <div class="legal">© 2026 UAGRM - PLATAFORMA INTELIGENTE</div>
+      </div>
+    </div>

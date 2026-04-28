@@ -1,0 +1,175 @@
+<div class="analytics-container animate-fade-up">
+  <header class="header">
+    <div class="title-row">
+      <mat-icon class="main-icon">query_stats</mat-icon>
+      <div>
+        <h1>Dashboard de <span>Eficiencia Operativa</span></h1>
+        <p>Control de cuellos de botella y rendimiento de ejecutivos en tiempo real.</p>
+      </div>
+    </div>
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <small>EFICIENCIA GLOBAL</small>
+        <h2>{{ stats.eficienciaGlobal }}%</h2>
+        <div class="trend" [class.up]="stats.eficienciaGlobal > 50"><mat-icon>analytics</mat-icon> Ratio Trabajo/Espera</div>
+      </div>
+      <div class="kpi-card highlight">
+        <small>CUELLO DE BOTELLA CRÍTICO</small>
+        <h2>{{ stats.cuelloCritico }}</h2>
+        <div class="status-badge warn">DEPARTAMENTO MÁS LENTO</div>
+      </div>
+      <div class="kpi-card">
+        <small>MÁXIMA EFICIENCIA</small>
+        <h2>{{ stats.mejorFuncionario }}</h2>
+        <div class="trend"><mat-icon>workspace_premium</mat-icon> Menor tiempo de despacho</div>
+      </div>
+    </div>
+  </header>
+
+  <div class="main-grid">
+    <!-- GRÁFICO DE CARGA HORARIA -->
+    <mat-card class="glass-card full-width">
+       <mat-card-header>
+         <mat-card-title><mat-icon>timeline</mat-icon> Fluctuación de Carga de Trámites (24h)</mat-card-title>
+       </mat-card-header>
+       <mat-card-content>
+         <div id="traffic-chart" *ngIf="isDataLoaded">
+            <apx-chart
+              [series]="trafficChartOptions.series!"
+              [chart]="trafficChartOptions.chart!"
+              [xaxis]="trafficChartOptions.xaxis!"
+              [stroke]="trafficChartOptions.stroke!"
+              [fill]="trafficChartOptions.fill!"
+              [theme]="trafficChartOptions.theme!"
+              [colors]="trafficChartOptions.colors!"
+            ></apx-chart>
+         </div>
+         <div class="loading-overlay" *ngIf="!isDataLoaded">
+            <mat-spinner diameter="40"></mat-spinner>
+            <p>Calculando tráfico real...</p>
+         </div>
+       </mat-card-content>
+    </mat-card>
+
+    <div class="two-columns">
+      <!-- DEPARTAMENTOS MÁS LENTOS (CUELLOS DE BOTELLA REALES) -->
+      <mat-card class="glass-card">
+        <mat-card-header>
+          <mat-card-title><mat-icon>speed</mat-icon> Desempeño por Depto.</mat-card-title>
+          <mat-card-subtitle>Segundos de espera vs trabajo</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+           <div id="depto-chart" *ngIf="isDataLoaded">
+              <apx-chart
+                [series]="deptoChartOptions.series!"
+                [chart]="deptoChartOptions.chart!"
+                [xaxis]="deptoChartOptions.xaxis!"
+                [plotOptions]="deptoChartOptions.plotOptions!"
+                [legend]="deptoChartOptions.legend!"
+                [theme]="deptoChartOptions.theme!"
+                [yaxis]="deptoChartOptions.yaxis!"
+                [dataLabels]="deptoChartOptions.dataLabels!"
+              ></apx-chart>
+           </div>
+           <div class="loading-overlay" *ngIf="!isDataLoaded">
+              <p>Analizando departamentos...</p>
+           </div>
+        </mat-card-content>
+      </mat-card>
+
+      <!-- RANKING EJECUTIVOS PLANO (POR DEPARTAMENTO) -->
+      <mat-card class="glass-card ranking-card">
+        <mat-card-header>
+          <mat-card-title><mat-icon>emoji_events</mat-icon> Ranking de Eficiencia</mat-card-title>
+          <mat-card-subtitle>Listado completo de ejecutivos del más eficiente al menos eficiente</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content class="premium-ranking-list">
+           
+           <div class="exec-premium-card animate-pop-in" *ngFor="let item of rankingGlobal; let i = index" [class.no-tasks]="item.tareasRealizadas === 0">
+             
+             <!-- POSICIÓN EN RANKING -->
+             <div class="rank-badge" [class.top1]="i === 0" [class.top2]="i === 1" [class.top3]="i === 2">
+                #{{ i + 1 }}
+             </div>
+
+             <!-- SCORE GLOBAL ESQUINA -->
+             <div class="global-score-tag">
+                <span class="score-val">{{ getScore(item) }}</span>
+                <span class="score-lbl">SCORE GLOBAL</span>
+                <span class="efficiency-badge" [ngClass]="getEfficiencyClass(getScore(item))">
+                   {{ getEfficiencyLabel(getScore(item)) }}
+                </span>
+             </div>
+
+             <div class="exec-header">
+                <img [src]="item.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + item.nombre" class="avatar-pro">
+                <div class="exec-name-box">
+                   <h3>{{ item.nombre }}</h3>
+                   <div class="master-tag" *ngIf="item.tareasRealizadas > 0">
+                      <mat-icon>workspace_premium</mat-icon>
+                      <span>MASTER EN {{ item.especialidad }}</span>
+                   </div>
+                   <p class="exec-id" *ngIf="item.tareasRealizadas === 0">Sin actividad registrada</p>
+                </div>
+             </div>
+
+             <!-- MÉTRICAS AVANZADAS (PUNTO 1, 3, 5) -->
+             <div class="advanced-stats-container" *ngIf="item.tareasRealizadas > 0">
+                <div class="advanced-stats-grid">
+                   <div class="stat-item">
+                      <span class="val">{{ formatTime(item.tma) }}</span>
+                      <span class="lbl">TMA</span>
+                   </div>
+                   <div class="stat-item">
+                      <span class="val">{{ formatTime(item.reaccion) }}</span>
+                      <span class="lbl">REACCIÓN</span>
+                   </div>
+                   <div class="stat-item">
+                      <div class="trend-indicator" [ngClass]="item.tendencia?.toLowerCase()">
+                         <mat-icon>{{ item.tendencia === 'SUBE' ? 'trending_up' : (item.tendencia === 'BAJA' ? 'trending_down' : 'trending_flat') }}</mat-icon>
+                         <span>{{ item.tendencia }}</span>
+                      </div>
+                      <span class="lbl">TENDENCIA</span>
+                   </div>
+                </div>
+
+                <div class="consistency-bar-wrapper">
+                   <div class="consist-lbl">
+                      <span>ÍNDICE DE CONSISTENCIA</span>
+                      <span>{{ item.consistencia > 100 ? 'Errático' : 'Predecible' }}</span>
+                   </div>
+                   <div class="consist-bar">
+                      <div class="consist-fill" [style.width.%]="item.consistencia > 300 ? 10 : (100 - (item.consistencia/3))"></div>
+                   </div>
+                </div>
+             </div>
+
+             <!-- MATRIZ DE DEPARTAMENTOS -->
+             <div class="dept-matrix" *ngIf="item.tareasRealizadas > 0">
+                <div class="dept-row" *ngFor="let d of item.departamentos" [ngClass]="getDeptoClass(d.promedio)">
+                   <div class="dept-name">
+                      <mat-icon>{{ d.depto === 'GENERAL' ? 'store' : 'business' }}</mat-icon>
+                      <span>{{ d.depto }}</span>
+                   </div>
+                   <div class="dept-stats">
+                      <span class="time">{{ formatTime(d.promedio) }}</span>
+                      <span class="label">{{ getDeptoLabel(d.promedio) }}</span>
+                   </div>
+                </div>
+             </div>
+
+             <div class="no-stats-placeholder" *ngIf="item.tareasRealizadas === 0">
+                <mat-icon>info</mat-icon>
+                <span>Sin datos suficientes para análisis detallado</span>
+             </div>
+           </div>
+
+           <div class="empty-state-pro" *ngIf="rankingGlobal.length === 0">
+              <mat-icon>analytics</mat-icon>
+              <p>Esperando datos de ejecución para generar el ranking...</p>
+           </div>
+        </mat-card-content>
+      </mat-card>
+    </div>
+  </div>
+</div>

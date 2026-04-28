@@ -1,0 +1,58 @@
+<div class="monitor-container">
+  <header>
+    <h1><mat-icon>dashboard</mat-icon> Monitor de Tareas del Funcionario ({{ laneId }})</h1>
+  </header>
+
+  <div class="columns">
+    <!-- PENDIENTES -->
+    <div class="column">
+      <h2 class="title-pendientes">Pendientes ({{ pendientes.length }})</h2>
+      <div class="task-list">
+        <mat-card *ngFor="let t of pendientes" class="task-card pendiente">
+          <mat-card-header>
+            <mat-card-title>{{ t.nodoNombre }}</mat-card-title>
+            <mat-card-subtitle>Solicitante: {{ t.solicitanteNombre || 'Anónimo' }}</mat-card-subtitle>
+          </mat-card-header>
+          <mat-card-content>
+            <p><mat-icon>schedule</mat-icon> Esperando hace: {{ calcularTiempo(t.fechaInicio) }}</p>
+          </mat-card-content>
+          <mat-card-actions>
+            <button mat-flat-button color="primary" (click)='atenderTarea(t)'>
+              <mat-icon>play_arrow</mat-icon> Atender
+            </button>
+          </mat-card-actions>
+        </mat-card>
+      </div>
+    </div>
+
+    <!-- EN PROCESO -->
+    <div class="column">
+      <h2 class="title-proceso">En Proceso ({{ enProceso.length }})</h2>
+      <div class="task-list">
+        <mat-card *ngFor="let t of enProceso" class="task-card proceso">
+          <mat-card-header>
+            <mat-card-title>{{ t.nodoNombre }}</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <p><mat-icon>hourglass_empty</mat-icon> En atención: {{ calcularTiempo(t.fechaInicio) }}</p>
+          </mat-card-content>
+        </mat-card>
+      </div>
+    </div>
+
+    <!-- COMPLETADAS -->
+    <div class="column">
+      <h2 class="title-completadas">Completadas ({{ completadas.length }})</h2>
+      <div class="task-list">
+        <mat-card *ngFor="let t of completadas" class="task-card completada">
+          <mat-card-header>
+            <mat-card-title>{{ t.nodoNombre }}</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <p><mat-icon>check_circle</mat-icon> Finalizada</p>
+          </mat-card-content>
+        </mat-card>
+      </div>
+    </div>
+  </div>
+</div>

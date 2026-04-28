@@ -1,0 +1,13 @@
+.dashboard-container { padding: 20px; max-width: 1200px; margin: 0 auto; }
+.ingestion-card { margin-bottom: 20px; }
+.ingestion-grid { display: flex; gap: 20px; margin: 20px 0; }
+.ingestion-item { flex: 1; display: flex; align-items: center; justify-content: center; }
+.full-width { width: 100%; margin-top: 15px; }
+mat-tab-group { margin-top: 20px; background: white; border-radius: 4px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+
+/* Estilos para el estado de carga IA */
+.ia-action-container { margin-top: 20px; }
+.progress-container { margin-bottom: 15px; text-align: center; }
+.progress-label { display: block; margin-top: 5px; color: #666; font-style: italic; }
+.btn-spinner { display: inline-block; margin-right: 10px; vertical-align: middle; }
+.full-width-btn { width: 100%; height: 48px; font-weight: 500; }
