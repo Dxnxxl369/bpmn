@@ -118,7 +118,9 @@ public class InstanciaController {
             observaciones.forEach((campoRechazado, motivo) -> {
                 // Buscamos el documento actual de ese tipo para este cliente/instancia
                 List<com.uagrm.gestion.tramites.model.Documento> docsAsociados = motorService.obtenerDocumentosCliente(clienteCi).stream()
-                    .filter(d -> d.getEsActual() && d.getTipoDocumento().equalsIgnoreCase(campoRechazado))
+                    .filter(d -> Boolean.TRUE.equals(d.getEsActual()) && 
+                                d.getTipoDocumento() != null && 
+                                d.getTipoDocumento().equalsIgnoreCase(campoRechazado))
                     .collect(java.util.stream.Collectors.toList());
                 
                 for(com.uagrm.gestion.tramites.model.Documento doc : docsAsociados) {

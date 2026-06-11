@@ -177,21 +177,49 @@ public class FormularioService {
     }
 
     private String cleanJsonResponse(String raw) {
-        if (raw == null || raw.isBlank()) return "{}";
-        String result = raw.trim();
+        if (raw == null || raw.isBlank()) return "[]";
+        
+        // 1. Limpieza inicial extrema (BOM, invisibles)
+        String result = raw.replace("\uFEFF", "").replaceAll("[\\p{C}]", "").trim();
+        
+        // 2. Extraer el bloque de código si está envuelto en Markdown
         if (result.contains("```")) {
             int start = result.indexOf("```");
-            int firstNewLine = result.indexOf("\n", start);
-            if (firstNewLine == -1) firstNewLine = start + 3;
             int end = result.lastIndexOf("```");
-            if (end > firstNewLine) result = result.substring(firstNewLine, end).trim();
+            if (end > start + 3) {
+                String block = result.substring(start + 3, end).trim();
+                // Quitar el lenguaje si existe (ej: ```json)
+                if (block.toLowerCase().startsWith("json")) {
+                    block = block.substring(4).trim();
+                }
+                result = block;
+            }
         }
-        if (!result.startsWith("{")) {
-            int firstBrace = result.indexOf("{");
-            int lastBrace = result.lastIndexOf("}");
-            if (firstBrace != -1 && lastBrace != -1 && lastBrace > firstBrace) result = result.substring(firstBrace, lastBrace + 1).trim();
+        
+        // 3. Buscar el primer '[' y el último ']'
+        int firstBracket = result.indexOf("[");
+        int lastBracket = result.lastIndexOf("]");
+        
+        if (firstBracket != -1 && lastBracket > firstBracket) {
+            // Caso ideal: Tenemos un array definido
+            return result.substring(firstBracket, lastBracket + 1).trim();
         }
-        return result;
+        
+        // 4. Fallback: Si no hay array, buscar el primer '{' y el último '}'
+        int firstBrace = result.indexOf("{");
+        int lastBrace = result.lastIndexOf("}");
+        
+        if (firstBrace != -1 && lastBrace >= firstBrace) {
+            String content = result.substring(firstBrace, lastBrace + 1).trim();
+            // Si hay comas entre objetos pero no hay [], lo envolvemos
+            if (content.contains("},") || content.contains("}\n,")) {
+                return "[" + content + "]";
+            }
+            // Si es un solo objeto, también lo envolvemos para que sea una lista
+            return "[" + content + "]";
+        }
+        
+        return "[]";
     }
 
     private String callGroq(String userPrompt, String systemPrompt) throws Exception {

@@ -314,97 +314,97 @@ public class PoliticaNegocioService {
 
     private void buscarDecisionSiguiente(Document doc, String taskId, TareaInfo info, Map<String, String> laneMap) {
         try {
-            // Usamos getElementsByTagName("*") para ser más resilientes a falta de namespaces
+            // 1. Encontrar el nodo de la tarea por ID
             NodeList allNodes = doc.getElementsByTagName("*");
             Element taskNode = null;
             for(int i=0; i<allNodes.getLength(); i++) {
                 Element n = (Element) allNodes.item(i);
-                if (n.getAttribute("id").equals(taskId)) {
+                if (taskId.equals(n.getAttribute("id"))) {
                     taskNode = n;
                     break;
                 }
             }
             if (taskNode == null) return;
 
-            // Buscar flujos salientes (etiquetas <outgoing>)
+            // 2. Obtener TODOS los flujos salientes (outgoing)
+            List<String> outgoingFlowIds = new ArrayList<>();
             NodeList outFlows = taskNode.getElementsByTagName("outgoing");
-            if (outFlows.getLength() == 0) {
-                // Reintento con namespace agnostic
-                outFlows = taskNode.getElementsByTagNameNS("*", "outgoing");
-            }
+            if (outFlows.getLength() == 0) outFlows = taskNode.getElementsByTagNameNS("*", "outgoing");
             
-            if (outFlows.getLength() == 0) return;
-
-            // Tomar el primer flujo (el que lleva al DecisionNode)
-            String flowId = outFlows.item(0).getTextContent().trim();
-            
-            NodeList controlFlows = doc.getElementsByTagName("ControlFlow");
-            if (controlFlows.getLength() == 0) {
-                controlFlows = doc.getElementsByTagNameNS("*", "ControlFlow");
+            for (int i = 0; i < outFlows.getLength(); i++) {
+                outgoingFlowIds.add(outFlows.item(i).getTextContent().trim());
             }
 
-            String targetId = null;
-            for(int i=0; i<controlFlows.getLength(); i++) {
-                Element flow = (Element) controlFlows.item(i);
-                if (flow.getAttribute("id").equals(flowId)) {
-                    targetId = flow.getAttribute("targetRef");
-                    break;
+            if (outgoingFlowIds.isEmpty()) return;
+
+            // 3. Mapear ControlFlows/SequenceFlows
+            NodeList flows = doc.getElementsByTagName("ControlFlow");
+            if (flows.getLength() == 0) flows = doc.getElementsByTagNameNS("*", "ControlFlow");
+            if (flows.getLength() == 0) flows = doc.getElementsByTagName("sequenceFlow");
+            if (flows.getLength() == 0) flows = doc.getElementsByTagNameNS("*", "sequenceFlow");
+
+            for (String flowId : outgoingFlowIds) {
+                String targetId = null;
+                for(int i=0; i<flows.getLength(); i++) {
+                    Element flow = (Element) flows.item(i);
+                    if (flowId.equals(flow.getAttribute("id"))) {
+                        targetId = flow.getAttribute("targetRef");
+                        break;
+                    }
                 }
-            }
 
-            if (targetId != null) {
-                for(int i=0; i<allNodes.getLength(); i++) {
-                    Element n = (Element) allNodes.item(i);
-                    String tagName = n.getTagName();
-                    // Verificar si el destino es un DecisionNode
-                    if (n.getAttribute("id").equals(targetId) && tagName.contains("DecisionNode")) {
-                        info.setEsPuntoDecision(true);
-                        List<TareaInfo.DecisionBranch> ramas = new ArrayList<>();
+                if (targetId != null) {
+                    for(int i=0; i<allNodes.getLength(); i++) {
+                        Element n = (Element) allNodes.item(i);
+                        String localName = n.getLocalName() != null ? n.getLocalName() : n.getTagName();
                         
-                        NodeList gwOuts = n.getElementsByTagName("outgoing");
-                        if (gwOuts.getLength() == 0) {
-                            gwOuts = n.getElementsByTagNameNS("*", "outgoing");
-                        }
+                        // Si el destino es un DecisionNode o ExclusiveGateway (BPMN)
+                        if (targetId.equals(n.getAttribute("id")) && 
+                           (localName.contains("DecisionNode") || localName.contains("ExclusiveGateway"))) {
+                            
+                            info.setEsPuntoDecision(true);
+                            List<TareaInfo.DecisionBranch> ramas = new ArrayList<>();
+                            
+                            // Obtener flujos salientes del Gateway
+                            NodeList gwOuts = n.getElementsByTagName("outgoing");
+                            if (gwOuts.getLength() == 0) gwOuts = n.getElementsByTagNameNS("*", "outgoing");
 
-                        for (int j = 0; j < gwOuts.getLength(); j++) {
-                            String branchFlowId = gwOuts.item(j).getTextContent().trim();
-                            for (int k = 0; k < controlFlows.getLength(); k++) {
-                                Element s = (Element) controlFlows.item(k);
-                                if (s.getAttribute("id").equals(branchFlowId)) {
-                                    String condicion = s.getAttribute("name");
-                                    String destNodeId = s.getAttribute("targetRef");
-                                    
-                                    // Buscar nombre y depto del nodo destino final de la rama
-                                    String destName = null;
-                                    for(int m=0; m<allNodes.getLength(); m++) {
-                                        Element node = (Element) allNodes.item(m);
-                                        if (node.getAttribute("id").equals(destNodeId)) {
-                                            destName = node.getAttribute("name");
-                                            if (destName == null || destName.trim().isEmpty()) {
-                                                String local = node.getLocalName();
-                                                if (local == null) local = node.getTagName();
-                                                
-                                                if (local.contains("InitialNode")) destName = "Inicio";
-                                                else if (local.contains("ActivityFinalNode")) destName = "Fin";
-                                                else if (local.contains("OpaqueAction")) destName = "Actividad";
-                                                else if (local.contains("DecisionNode")) destName = "Decisión";
-                                                else destName = local;
+                            for (int j = 0; j < gwOuts.getLength(); j++) {
+                                String branchFlowId = gwOuts.item(j).getTextContent().trim();
+                                for (int k = 0; k < flows.getLength(); k++) {
+                                    Element s = (Element) flows.item(k);
+                                    if (branchFlowId.equals(s.getAttribute("id"))) {
+                                        String condicion = s.getAttribute("name");
+                                        String destNodeId = s.getAttribute("targetRef");
+                                        
+                                        // Buscar nombre y depto del nodo destino
+                                        String destName = "Fin";
+                                        for(int m=0; m<allNodes.getLength(); m++) {
+                                            Element node = (Element) allNodes.item(m);
+                                            if (destNodeId.equals(node.getAttribute("id"))) {
+                                                destName = node.getAttribute("name");
+                                                if (destName == null || destName.trim().isEmpty()) {
+                                                    String ln = node.getLocalName() != null ? node.getLocalName() : node.getTagName();
+                                                    if (ln.contains("InitialNode")) destName = "Inicio";
+                                                    else if (ln.contains("ActivityFinalNode")) destName = "Fin";
+                                                    else if (ln.contains("DecisionNode") || ln.contains("ExclusiveGateway")) destName = "Decisión";
+                                                    else destName = ln;
+                                                }
+                                                break;
                                             }
-                                            break;
                                         }
+                                        
+                                        String destLane = laneMap.get(destNodeId);
+                                        String fullDestName = destName + (destLane != null ? " (" + destLane + ")" : "");
+                                        if (condicion == null || condicion.trim().isEmpty()) condicion = "Opción " + (ramas.size() + 1);
+                                        
+                                        ramas.add(new TareaInfo.DecisionBranch(branchFlowId, condicion, destNodeId, fullDestName));
                                     }
-                                    
-                                    if (destName == null) destName = "Fin";
-
-                                    String destLane = laneMap.get(destNodeId);
-                                    String fullDestName = destName + (destLane != null ? " (" + destLane + ")" : "");
-
-                                    if (condicion == null || condicion.trim().isEmpty()) condicion = "Opción " + (j + 1);
-                                    ramas.add(new TareaInfo.DecisionBranch(branchFlowId, condicion, destNodeId, fullDestName));
                                 }
                             }
+                            info.setRamas(ramas);
+                            return; // Encontrado
                         }
-                        info.setRamas(ramas);
                     }
                 }
             }

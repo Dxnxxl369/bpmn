@@ -113,15 +113,40 @@ public class FormularioController {
     }
 
     private String fuseDecisionLogic(String json, TareaInfo info) {
+        if (json == null || json.isBlank()) json = "[]";
+        
+        // Limpieza profunda de caracteres invisibles y BOM
+        String cleanJson = json.replace("\uFEFF", "").trim();
+
         if (info == null || !info.isEsPuntoDecision() || info.getRamas() == null || info.getRamas().isEmpty()) {
-            return json;
+            return cleanJson;
         }
 
         try {
             com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-            List<Map<String, Object>> fields = mapper.readValue(json, new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, Object>>>() {});
+            List<Map<String, Object>> fields;
             
-            // Buscar si ya existe el decision_motor
+            try {
+                // Si ya es un array, lo parseamos
+                if (cleanJson.startsWith("[")) {
+                    fields = mapper.readValue(cleanJson, new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, Object>>>() {});
+                } else if (cleanJson.startsWith("{")) {
+                    // Si es un objeto único o lista sin [], lo envolvemos
+                    String wrapped = "[" + cleanJson + "]";
+                    fields = mapper.readValue(wrapped, new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, Object>>>() {});
+                } else {
+                    return cleanJson;
+                }
+            } catch (Exception e) {
+                // Caso especial: El JSON viene como un String de JSON (con comillas extras)
+                if (cleanJson.startsWith("\"") && cleanJson.endsWith("\"")) {
+                    String unquoted = mapper.readValue(cleanJson, String.class);
+                    fields = mapper.readValue(unquoted, new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, Object>>>() {});
+                } else {
+                    return cleanJson;
+                }
+            }
+            
             Map<String, Object> decisionField = fields.stream()
                     .filter(f -> "decision_motor".equals(f.get("id")))
                     .findFirst().orElse(null);
@@ -131,7 +156,6 @@ public class FormularioController {
                     .collect(java.util.stream.Collectors.toList());
 
             if (decisionField == null) {
-                // Si no existe, lo inyectamos al final
                 decisionField = new java.util.HashMap<>();
                 decisionField.put("id", "decision_motor");
                 decisionField.put("label", "¿Hacia dónde continúa el trámite?");
@@ -140,15 +164,14 @@ public class FormularioController {
                 decisionField.put("options", opcionesBpm);
                 fields.add(decisionField);
             } else {
-                // Si existe, actualizamos sus opciones para que coincidan con el BPMN actual
-                decisionField.put("type", "select"); // Forzar tipo
-                decisionField.put("required", true); // Forzar requerido
-                decisionField.put("options", opcionesBpm); // Sincronizar opciones
+                decisionField.put("type", "select");
+                decisionField.put("required", true);
+                decisionField.put("options", opcionesBpm);
             }
 
-            return mapper.writeValueAsString(fields);
+            return mapper.writeValueAsString(fields).trim();
         } catch (Exception e) {
-            return json;
+            return cleanJson;
         }
     }
 
@@ -174,8 +197,22 @@ public class FormularioController {
             @RequestParam String politicaId,
             @RequestParam String taskId) {
         
-        return schemaRepository.findByPoliticaIdAndTaskDefinitionId(politicaId, taskId.toLowerCase())
-                .map(s -> ResponseEntity.ok(s.getSchemaJson()))
-                .orElse(ResponseEntity.notFound().build());
+        Optional<FormularioSchema> schemaOpt = schemaRepository.findByPoliticaIdAndTaskDefinitionId(politicaId, taskId.toLowerCase());
+        
+        if (schemaOpt.isPresent()) {
+            FormularioSchema schema = schemaOpt.get();
+            String schemaJson = schema.getSchemaJson();
+            if (schemaJson == null || schemaJson.isBlank()) schemaJson = "[]";
+            
+            List<TareaInfo> tareas = politicaService.extraerTareasUsuario(politicaId);
+            TareaInfo estaTarea = tareas.stream()
+                    .filter(t -> t.getId().equalsIgnoreCase(taskId))
+                    .findFirst().orElse(null);
+            
+            schemaJson = fuseDecisionLogic(schemaJson, estaTarea);
+            return ResponseEntity.ok(schemaJson.trim());
+        }
+        
+        return ResponseEntity.ok("[]");
     }
 }

@@ -149,6 +149,7 @@
               <form [formGroup]="form" (ngSubmit)="onSubmit()">
                   <div *ngFor="let field of fields" class="field-group" 
                       [class.active-highlight]="highlightId === field.id"
+                      [class.decision-motor-field]="field.id === 'decision_motor'"
                       [class.field-readonly]="field.readOnly"
                       [class.field-rejected]="esCampoObservado(field.id)"
                       (mouseenter)="fieldHovered.emit(field.id)"

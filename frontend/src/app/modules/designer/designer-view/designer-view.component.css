@@ -980,19 +980,22 @@
 
     /* Proteccion de campos en el editor */
     .field-card-pro.is-protected {
-      border-color: var(--accent-orange, #f59e0b) !important;
-      opacity: 0.9;
+      border-color: #fdd835 !important;
+      background: rgba(255, 235, 59, 0.1) !important;
+      box-shadow: 0 0 20px rgba(253, 216, 53, 0.2);
+      opacity: 1;
     }
 
     .protected-badge {
-      background: var(--accent-orange, #f59e0b);
-      color: white;
+      background: #fdd835;
+      color: #000;
       font-size: 0.6rem;
-      font-weight: 900;
+      font-weight: 950;
       padding: 2px 8px;
       border-radius: 4px;
       margin-bottom: 12px;
       display: inline-block;
+      box-shadow: 0 4px 10px rgba(253, 216, 53, 0.3);
     }
 
     .field-card-pro.is-protected .del-btn-premium {
@@ -1001,7 +1004,8 @@
 
     .field-card-pro.is-protected .label-input-premium {
       pointer-events: none;
-      color: var(--accent-orange, #f59e0b) !important;
+      color: #fdd835 !important;
+      text-shadow: 0 0 5px rgba(253, 216, 53, 0.2);
     }
 
     .field-card-pro.is-protected .premium-toggle {

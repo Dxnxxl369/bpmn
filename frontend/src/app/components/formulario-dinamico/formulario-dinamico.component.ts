@@ -390,17 +390,6 @@ export class FormularioDinamicoComponent implements OnInit, OnChanges {
     return this.instancia?.observacionesCampos ? this.instancia.observacionesCampos[fieldId] : '';
   }
 
-  solicitarSubsanacion() {
-    if (!this.taskInstanceId) return;
-    if (!confirm("¿Está seguro de enviar este trámite a subsanación por el ciudadano?")) return;
-
-    this.http.post(`http://localhost:8080/api/instancias/tareas/${this.taskInstanceId}/solicitar-subsanacion`, {})
-      .subscribe(() => {
-        this.snackBar.open("📢 Trámite enviado a subsanación. Se notificará al cliente.", "OK", { duration: 5000 });
-        this.closed.emit(); // Cerrar el formulario
-      });
-  }
-
   setZoom(delta: number) {
     this.zoomLevel = Math.max(0.5, Math.min(3.0, this.zoomLevel + delta));
     this.cdr.detectChanges();

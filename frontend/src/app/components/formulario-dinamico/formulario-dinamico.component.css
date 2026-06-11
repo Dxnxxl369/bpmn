@@ -540,6 +540,23 @@
   box-sizing: border-box;
 }
 
+/* ESPECIAL: MOTOR DE DECISIÓN (AMARILLO) */
+.field-group.decision-motor-field {
+  background: rgba(253, 216, 53, 0.05) !important;
+  border: 2px solid #fdd835 !important;
+  box-shadow: 0 0 20px rgba(253, 216, 53, 0.15);
+}
+
+.field-group.decision-motor-field label {
+  color: #fdd835 !important;
+  font-weight: 950;
+}
+
+.field-group.decision-motor-field select {
+  border-color: rgba(253, 216, 53, 0.3) !important;
+  background-color: rgba(0, 0, 0, 0.1) !important;
+}
+
 /* HOVER NARANJA PREMIUM VIBRANTE */
 .field-group:hover, .field-group.active-highlight {
   border-color: var(--primary-color); 

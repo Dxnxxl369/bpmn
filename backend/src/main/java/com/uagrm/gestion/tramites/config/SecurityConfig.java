@@ -36,6 +36,7 @@ public class SecurityConfig {
                 .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                 
                 .requestMatchers("/api/instancias/**").hasAnyRole("ADMINISTRADOR", "FUNCIONARIO")
+                .requestMatchers("/api/instancias/tareas/**").hasAnyRole("ADMINISTRADOR", "FUNCIONARIO")
                 .requestMatchers("/api/usuarios/me", "/api/usuarios/update", "/api/usuarios/ejecutivos").hasAnyRole("ADMINISTRADOR", "FUNCIONARIO")
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/politicas/**").hasAnyRole("ADMINISTRADOR", "FUNCIONARIO")
                 .requestMatchers("/api/departamentos", "/api/departamentos/**").hasAnyRole("ADMINISTRADOR", "FUNCIONARIO")

@@ -331,8 +331,21 @@ export class DesignerViewComponent implements OnInit, OnDestroy {
 
     if (t.tieneFormulario || t.estadoFormulario !== 'VACIO') {
       this.bpmsService.generarFormulario(this.politicaSeleccionada!.id!, t.id).subscribe(schema => {
-        let fields = JSON.parse(schema);
-        this.camposActuales = fields; this.jsonSchemaString = JSON.stringify(fields); this.cdr.detectChanges();
+        try {
+            let fields;
+            if (typeof schema === 'string') {
+                const cleanJson = schema.trim();
+                fields = JSON.parse(cleanJson);
+            } else {
+                fields = schema;
+            }
+            this.camposActuales = fields; 
+            this.jsonSchemaString = JSON.stringify(fields); 
+            this.cdr.detectChanges();
+        } catch (e) {
+            console.error("Error parsing form schema:", e, schema);
+            this.snackBar.open('⚠️ Error al cargar el formulario. El formato es inválido.', 'Cerrar');
+        }
       });
     } else {
       this.camposActuales = []; this.jsonSchemaString = '[]'; this.cdr.detectChanges();
