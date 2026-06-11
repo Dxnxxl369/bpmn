@@ -1,0 +1,135 @@
+<div class="bitacora-container animate-fade-in">
+    <header class="page-header">
+      <div class="header-main">
+        <div class="badge-premium">GOVERNANCE & AUDIT</div>
+        <h1>Bitácora de <span>Operaciones</span></h1>
+        <p class="text-muted">Explorador granular de cambios y acciones en el motor BPMS.</p>
+      </div>
+      <div class="header-actions-row">
+          <button class="view-mode-btn" [class.active]="modoAgrupado" (click)="toggleAgrupamiento()">
+            <mat-icon>{{ modoAgrupado ? 'account_tree' : 'reorder' }}</mat-icon>
+            {{ modoAgrupado ? 'MODO JERÁRQUICO' : 'MODO APLANADO' }}
+          </button>
+      </div>
+    </header>
+
+    <!-- PANEL DE FILTROS AVANZADOS -->
+    <div class="filter-panel glass-card">
+      <div class="filter-grid">
+        <div class="filter-group">
+          <label>Responsable</label>
+          <div class="input-with-icon">
+            <mat-icon>person_search</mat-icon>
+            <input type="text" [(ngModel)]="filtroUsuario" (input)="aplicarFiltros()" placeholder="Nombre o Email...">
+          </div>
+        </div>
+
+        <div class="filter-group">
+          <label>Módulo</label>
+          <div class="input-with-icon">
+            <mat-icon>category</mat-icon>
+            <select [(ngModel)]="filtroModulo" (change)="aplicarFiltros()">
+              <option value="">Todos los módulos</option>
+              <option *ngFor="let mod of modulosDisponibles" [value]="mod">{{ mod }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="filter-group">
+          <label>Fecha y Rango de Hora</label>
+          <div class="time-range-row">
+            <input type="date" [(ngModel)]="filtroFecha" (change)="aplicarFiltros()">
+            <span class="range-sep">DE</span>
+            <input type="time" [(ngModel)]="filtroHoraInicio" (change)="aplicarFiltros()">
+            <span class="range-sep">A</span>
+            <input type="time" [(ngModel)]="filtroHoraFin" (change)="aplicarFiltros()">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LEYENDA DE COLORES -->
+    <nav class="legend-bar-pro">
+        <div class="legend-item"><div class="dot v-view"></div> AMARILLO: VISTA</div>
+        <div class="legend-item"><div class="dot v-create"></div> VERDE: CREAR</div>
+        <div class="legend-item"><div class="dot v-edit"></div> AZUL: EDITAR</div>
+        <div class="legend-item"><div class="dot v-delete"></div> ROJO: ELIMINAR</div>
+    </nav>
+
+    <mat-card class="glass-card table-card">
+      <div class="table-container scroll-custom-mini">
+        <table mat-table [dataSource]="dataSource" matSort>
+
+          <!-- Timestamp -->
+          <ng-container matColumnDef="timestamp">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header> MOMENTO </th>
+            <td mat-cell *matCellDef="let log"> 
+              <div class="time-cell" [style.padding-left.px]="modoAgrupado ? (log.level - 1) * 30 : 0">
+                <div class="tree-connector" *ngIf="modoAgrupado && log.level > 1"></div>
+                <mat-icon>schedule</mat-icon>
+                <span>{{ log.timestamp | date:'shortTime' }}</span>
+              </div>
+            </td>
+          </ng-container>
+
+          <!-- Usuario -->
+          <ng-container matColumnDef="usuario">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header> RESPONSABLE </th>
+            <td mat-cell *matCellDef="let log">
+              <div class="user-cell" [style.opacity]="modoAgrupado && log.level > 1 ? 0.4 : 1">
+                <div class="avatar-mini-box" *ngIf="!modoAgrupado || log.level === 1">{{ log.usuarioNombre ? log.usuarioNombre.charAt(0) : 'S' }}</div>
+                <div class="user-text">
+                    <strong>{{ log.usuarioNombre || 'Sistema' }}</strong>
+                    <small *ngIf="!modoAgrupado || log.level === 1">{{ log.usuarioId }}</small>
+                </div>
+              </div>
+            </td>
+          </ng-container>
+
+          <!-- Módulo -->
+          <ng-container matColumnDef="modulo">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header> MÓDULO </th>
+            <td mat-cell *matCellDef="let log">
+              <span class="modulo-badge-pro">{{ log.modulo }}</span>
+            </td>
+          </ng-container>
+
+          <!-- Acción -->
+          <ng-container matColumnDef="accion">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header> ACCIÓN </th>
+            <td mat-cell *matCellDef="let log">
+              <span class="action-tag-pro" [ngClass]="getAccionClass(log.accion)">
+                <mat-icon>{{ getAccionIcon(log.accion) }}</mat-icon>
+                {{ log.accion.replace('_', ' ') }}
+              </span>
+            </td>
+          </ng-container>
+
+          <!-- Detalles -->
+          <ng-container matColumnDef="detalles">
+            <th mat-header-cell *matHeaderCellDef> DETALLES TÉCNICOS </th>
+            <td mat-cell *matCellDef="let log" class="details-cell-pro">
+              {{ log.detalles }}
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;" 
+              class="log-row-pro" 
+              [class.row-level-1]="row.level === 1"
+              [class.row-level-2]="row.level === 2"
+              [class.row-level-3]="row.level === 3"
+              [class.row-level-4]="row.level === 4"
+              [ngClass]="getAccionClass(row.accion)"></tr>
+
+          <tr class="mat-row" *matNoDataRow>
+            <td class="mat-cell" colspan="5" style="padding: 60px; text-align: center;">
+              <mat-icon style="font-size: 48px; width: 48px; height: 48px; color: #333; margin-bottom: 15px;">manage_search</mat-icon>
+              <p style="color: #666; font-weight: 700;">No se encontraron registros con esos filtros.</p>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <mat-paginator [pageSizeOptions]="[50, 100, 500]" showFirstLastButtons aria-label="Registros de auditoría"></mat-paginator>
+    </mat-card>
+</div>

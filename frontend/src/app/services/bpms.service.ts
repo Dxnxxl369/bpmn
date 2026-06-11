@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { AuthService } from './auth.service';
 
 export interface PoliticaNegocio {
   id?: string;
@@ -9,12 +10,16 @@ export interface PoliticaNegocio {
   xmlBpmn: string;
   estado: string;
   ultimaModificacion: string;
+  origenTipo?: string;        // PDF, PROMPT, VOZ
+  origenContenido?: string;   // Texto del prompt o fragmento del PDF
+  documentoOrigenId?: string; // Enlace al documento en S3/DMS
 }
 
 export interface UsuarioEjecutivo {
   id: string;
   nombre: string;
   email: string;
+  avatar?: string;
   departamentoIds?: string[];
 }
 
@@ -28,12 +33,42 @@ export interface Departamento {
   providedIn: 'root'
 })
 export class BpmsService {
-  private apiUrl = 'http://13.217.197.171:8080/api/politicas';
-  private usrUrl = 'http://13.217.197.171:8080/api/usuarios';
-  private deptUrl = 'http://13.217.197.171:8080/api/departamentos';
-  private apiUrlForm = 'http://13.217.197.171:8080/api/formulario';
+  private apiUrl = 'http://localhost:8080/api/politicas';
+  private publicUrl = 'http://localhost:8080/api/public/servicios';
+  private usrUrl = 'http://localhost:8080/api/usuarios';
+  private deptUrl = 'http://localhost:8080/api/departamentos';
+  private apiUrlForm = 'http://localhost:8080/api/formulario';
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private authService: AuthService) {}
+
+  listarPoliticasPublicas(): Observable<PoliticaNegocio[]> {
+    return this.http.get<PoliticaNegocio[]>(this.publicUrl);
+  }
+
+  listarTareasPoliticaPublicas(id: string): Observable<any[]> {
+    return this.http.get<any[]>(`http://localhost:8080/api/public/politica/${id}/tareas`);
+  }
+
+  generarFormularioPublico(politicaId: string, taskId: string, instanciaId?: string): Observable<string> {
+    return this.http.get(`http://localhost:8080/api/public/formulario`, {
+      params: { politicaId, taskId, instanciaId: instanciaId || '' },
+      responseType: 'text'
+    });
+  }
+
+  verificarEstadoTramite(clienteCi: string, politicaId: string): Observable<any> {
+    return this.http.get(`http://localhost:8080/api/public/verificar-estado`, {
+      params: { clienteCi, politicaId }
+    });
+  }
+
+  enviarSubsanacion(instanciaId: string, respuestas: string): Observable<any> {
+    return this.http.post(`http://localhost:8080/api/public/subsanar-enviar`, { instanciaId, respuestas });
+  }
+
+  solicitarSubsanacion(tareaId: string, observaciones: any): Observable<any> {
+    return this.http.post(`http://localhost:8080/api/instancias/tareas/${tareaId}/solicitar-subsanacion`, observaciones);
+  }
 
   listarPoliticas(): Observable<PoliticaNegocio[]> {
     return this.http.get<PoliticaNegocio[]>(this.apiUrl);
@@ -102,29 +137,29 @@ export class BpmsService {
   }
 
   getTareasPendientes(laneId: string | string[]): Observable<any[]> {
-    return this.http.get<any[]>(`http://13.217.197.171:8080/api/instancias/tareas/pendientes`, {
+    return this.http.get<any[]>(`http://localhost:8080/api/instancias/tareas/pendientes`, {
       params: { laneId }
     });
   }
 
   getTareasEnProceso(laneId: string | string[]): Observable<any[]> {
-    return this.http.get<any[]>(`http://13.217.197.171:8080/api/instancias/tareas/en-proceso`, {
+    return this.http.get<any[]>(`http://localhost:8080/api/instancias/tareas/en-proceso`, {
       params: { laneId }
     });
   }
 
   getTareasCompletadas(laneId: string | string[]): Observable<any[]> {
-    return this.http.get<any[]>(`http://13.217.197.171:8080/api/instancias/tareas/completadas`, {
+    return this.http.get<any[]>(`http://localhost:8080/api/instancias/tareas/completadas`, {
       params: { laneId }
     });
   }
 
   completarTarea(tareaId: string, respuestas: any): Observable<any> {
-    return this.http.post(`http://13.217.197.171:8080/api/instancias/tareas/${tareaId}/completar`, respuestas);
+    return this.http.post(`http://localhost:8080/api/instancias/tareas/${tareaId}/completar`, respuestas);
   }
 
   atenderTarea(tareaId: string, userEmail: string): Observable<any> {
-    return this.http.post(`http://13.217.197.171:8080/api/instancias/tareas/${tareaId}/atender`, null, {
+    return this.http.post(`http://localhost:8080/api/instancias/tareas/${tareaId}/atender`, null, {
       params: { userEmail }
     });
   }
@@ -144,6 +179,10 @@ export class BpmsService {
     return this.http.post<any>(`${this.apiUrlForm}/politica/${politicaId}/tarea/${taskId}/generar?taskName=${taskName}`, {});
   }
 
+  triageIA(mensaje: string): Observable<any> {
+    return this.http.post('http://localhost:8080/api/public/triage', { mensaje });
+  }
+
   guardarFormularioManual(politicaId: string, taskId: string, schemaJson: string, estado: string, taskName?: string): Observable<any> {
     return this.http.post<any>(`${this.apiUrlForm}/politica/${politicaId}/tarea/${taskId}/guardar`, schemaJson, {
       params: { estado, taskName: taskName || '' }
@@ -158,19 +197,44 @@ export class BpmsService {
     return this.http.post(`${this.usrUrl}/predict-responses`, { schemaJson, documentoTexto });
   }
 
-  iniciarTramitePresencial(politicaId: string, respuestas: string, userEmail?: string): Observable<any> {
-    return this.http.post(`http://13.217.197.171:8080/api/instancias/iniciar-presencial`, { politicaId, respuestas, userEmail });
+  iniciarTramiteExterno(politicaId: string, respuestas: string, clienteCi: string): Observable<any> {
+    return this.http.post(`http://localhost:8080/api/instancias/iniciar-externo`, { politicaId, respuestas, clienteCi });
+  }
+
+  iniciarTramitePresencial(politicaId: string, respuestas: string, clienteCi: string, userEmail?: string): Observable<any> {
+    return this.http.post(`http://localhost:8080/api/instancias/iniciar-presencial`, { politicaId, respuestas, userEmail, clienteCi });
   }
 
   listarVersiones(id: string): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/${id}/versiones`);
   }
 
-  restaurarVersion(id: string, versionId: string): Observable<any> {
-    return this.http.post<any>(`${this.apiUrl}/${id}/versiones/${versionId}/restaurar`, {});
+  restaurarVersion(id: string, versionId: string, autor: string): Observable<PoliticaNegocio> {
+    return this.http.post<any>(`${this.apiUrl}/${id}/versiones/${versionId}/restaurar?autor=${encodeURIComponent(autor)}`, {});
+  }
+
+  registrarAuditoria(accion: string, modulo: string, entidadId: string, detalles: string): Observable<any> {
+    const user = (this.authService as any).userSubject?.value;
+    const payload = {
+      accion,
+      modulo,
+      entidadId,
+      detalles,
+      usuarioId: user ? user.email : 'SISTEMA',
+      usuarioNombre: user ? `${user.nombre} ${user.apellido}` : 'SISTEMA'
+    };
+    return this.http.post('http://localhost:8080/api/auditoria/registrar', payload);
+  }
+
+  generarDocumentoFinal(instanciaId: string, tareaId: string, html: string, userEmail: string): Observable<any> {
+    return this.http.post(`http://localhost:8080/api/instancias/${instanciaId}/generar-documento-final`, {
+      html,
+      tareaId,
+      userEmail
+    });
   }
 
   getInstanciaDetalle(instanciaId: string): Observable<any> {
-    return this.http.get<any>(`http://13.217.197.171:8080/api/instancias/${instanciaId}`);
+    return this.http.get<any>(`http://localhost:8080/api/instancias/${instanciaId}`);
   }
 }

@@ -1,113 +1,304 @@
-<div [class.form-workspace]="data?.isDialog">
+<div class="workspace-shell animate-fade-in" 
+     [class.design-mode]="isDesignMode || !isAuditMode"
+     [class.audit-mode]="isAuditMode && !isDesignMode"
+     [class.portal-mode]="isPortalMode"
+     [class.blur-processing]="procesandoVoz"
+     [style.grid-template-columns]="getGridColumns()">
+
+  <!-- OVERLAY DE PROCESAMIENTO IA -->
+  <div class="ai-processing-overlay" *ngIf="procesandoVoz">
+      <div class="ai-loader-box">
+          <mat-progress-spinner mode="indeterminate" diameter="60"></mat-progress-spinner>
+          <h3>IA Orquestador Analizando...</h3>
+          <p>Mapeando documentos con el formulario</p>
+      </div>
+  </div>
+
+  <!-- VENTANA EMERGENTE DE CONFIRMACIÓN DE VOZ -->
+  <div class="voice-confirm-overlay animate-pop-in" *ngIf="mostrarConfirmarVoz">
+      <div class="voice-card">
+          <header>
+              <mat-icon>graphic_eq</mat-icon>
+              <span>COMANDO DE VOZ DETECTADO</span>
+          </header>
+          <div class="transcript-preview">
+              "{{ transcriptTemp }}"
+          </div>
+          <div class="voice-actions">
+              <button class="btn-voice-cancel" (click)="cancelarComandoVoz()">REINTENTAR</button>
+              <button class="btn-voice-ok" (click)="confirmarComandoVoz()">CONFIRMAR <mat-icon>auto_awesome</mat-icon></button>
+          </div>
+      </div>
+  </div>
   
-  <!-- BARRA LATERAL: PERFIL DEL CLIENTE (Solo en modo Diálogo de Atención) -->
-  <aside class="client-sidebar animate-fade-in" *ngIf="data?.isDialog && data?.instancia">
-    <div class="client-avatar-box">
-      <mat-icon>person</mat-icon>
-    </div>
+  <!-- COL 1: DMS (LEFT) - OCULTO EN MODO DISEÑO -->
+  <aside class="dms-panel" *ngIf="!isDesignMode && (isAuditMode || instancia) && !isPortalMode">
+    <div class="section-tag">Expediente Digital</div>
     
-    <div class="client-info-group">
-      <span class="client-label">Solicitante</span>
-      <p class="client-value">{{ data.instancia.solicitanteNombre }}</p>
+    <div class="doc-list scroll-custom-mini">
+      <!-- SECCIÓN: CLIENTE (ÁRBOL ACTIVADO) -->
+      <div *ngFor="let doc of getDocsCliente()" class="doc-tree-group">
+          <div class="doc-card" 
+               [class.active]="selectedDoc?.id === doc.id"
+               (click)="selectDoc(doc)"
+               (contextmenu)="onRightClickDoc($event, doc)">
+            <div class="doc-icon-box">
+              <img *ngIf="!doc.nombreArchivo.endsWith('.pdf')" 
+                   [src]="doc.urlS3 | safeUrl" 
+                   class="doc-thumbnail-mini">
+              <mat-icon *ngIf="doc.nombreArchivo.endsWith('.pdf')">picture_as_pdf</mat-icon>
+            </div>
+            <div class="doc-content-wrapper">
+              <div class="doc-primary-type">
+                {{ doc.tipoDocumento | uppercase }}
+                <span class="version-badge" *ngIf="doc.version > 1">V{{ doc.version }}</span>
+              </div>
+              <div class="doc-secondary-name">{{ doc.nombreArchivo }}</div>
+            </div>
+          </div>
 
-      <span class="client-label">Documento / CI</span>
-      <p class="client-value">{{ getContextValue('ci') || 'No registrado' }}</p>
+          <!-- Sub-Versiones del Cliente -->
+          <div class="version-tree-child" *ngIf="expandedDocs.has(doc.id)">
+              <div *ngFor="let v of getVersionesDe(doc)" 
+                   class="tree-item" 
+                   [class.active]="selectedDoc?.id === v.id"
+                   (click)="selectDoc(v)">
+                  <mat-icon>history</mat-icon>
+                  <div style="display: flex; flex-direction: column; gap: 2px;">
+                      <span style="font-weight: 900; color: var(--primary-color);">V{{ v.version }}</span>
+                      <span style="font-size: 9px; opacity: 0.7;">{{ v.fechaSubida | date:'dd MMM, HH:mm' }}</span>
+                  </div>
+              </div>
+          </div>
+      </div>
 
-      <span class="client-label">Correo Electrónico</span>
-      <p class="client-value">{{ getContextValue('correo') || getContextValue('email') || 'No registrado' }}</p>
+      <!-- DIVISOR PREMIUM -->
+      <div class="dms-premium-divider" *ngIf="getDocsFuncionario().length > 0">
+          <div class="divider-line"></div>
+          <span>DOCUMENTOS DE GESTIÓN</span>
+          <div class="divider-line"></div>
+      </div>
 
-      <span class="client-label">Contacto</span>
-      <p class="client-value">{{ getContextValue('telefono') || getContextValue('celular') || 'Sin contacto' }}</p>
+      <!-- SECCIÓN: FUNCIONARIO (MÁGICA CON ÁRBOL) -->
+      <div *ngFor="let doc of getDocsFuncionario()" class="doc-tree-group">
+          <!-- Documento Actual -->
+          <div class="doc-card doc-funcionario-card" 
+               [class.active]="selectedDoc?.id === doc.id"
+               (click)="selectDoc(doc)"
+               (contextmenu)="onRightClickDoc($event, doc)">
+            <div class="doc-icon-box func-box">
+              <mat-icon>{{ expandedDocs.has(doc.id) ? 'keyboard_arrow_down' : 'description' }}</mat-icon>
+            </div>
+            <div class="doc-content-wrapper">
+              <div class="doc-primary-type">
+                {{ doc.nombreArchivo }}
+                <span class="version-badge">V{{ doc.version }}</span>
+              </div>
+              <div class="doc-secondary-name">{{ doc.funcionarioNombre }}</div>
+            </div>
+            <button mat-icon-button class="btn-info-mini" (click)="verInfoDocumento($event, doc)">
+                <mat-icon>info</mat-icon>
+            </button>
+          </div>
 
-      <div class="token-tracking-badge">
-        <div class="tracking-dot" [class]="data.instancia.resultadoFinal"></div>
-        <div class="tracking-text">
-          <small>CÓDIGO SEGUIMIENTO</small>
-          <span>{{ data.instancia.codigoSeguimiento }}</span>
+          <!-- Sub-Versiones (Árbol) -->
+          <div class="version-tree-child" *ngIf="expandedDocs.has(doc.id)">
+              <div *ngFor="let v of getVersionesDe(doc)" 
+                   class="tree-item" 
+                   [class.active]="selectedDoc?.id === v.id"
+                   (click)="selectDoc(v)">
+                  <mat-icon>history</mat-icon>
+                  <span>V{{ v.version }} • {{ v.fechaSubida | date:'shortTime' }}</span>
+              </div>
+          </div>
+      </div>
+    </div>
+
+    <!-- AI VOICE FOOTER -->
+    <div class="ai-voice-footer">
+      <button class="btn-new-doc-premium" (click)="prepararNuevoDocumento()">
+          <mat-icon>add_circle</mat-icon>
+          <span>NUEVO DOCUMENTO</span>
+      </button>
+
+      <div class="mic-row" style="margin-top: 15px;">
+        <button type="button" class="mic-btn-orb" [class.listening]="isListening" (click)="toggleMic()">
+          <mat-icon>{{ isListening ? 'mic' : 'mic_none' }}</mat-icon>
+        </button>
+        <div class="mic-status">
+          <div style="font-size: 11px; font-weight: 800; color: var(--text-main);">IA ASISTENTE</div>
+          <div style="font-size: 9px; color: var(--text-muted);">{{ isListening ? 'Escuchando dictado...' : 'Pulse para dictar' }}</div>
         </div>
       </div>
     </div>
   </aside>
 
-  <div class="dynamic-form-shell" [class.in-workspace]="data?.isDialog">
-    <header class="form-header">
-      <h2>Gestión de <span>Trámite</span></h2>
-      <p>Procesamiento digital de la solicitud.</p>
-    </header>
+  <!-- BLOQUE DINÁMICO: FORMULARIO + VISOR O EDITOR -->
+  <ng-container *ngIf="!selectedDoc?.esColaborativo">
+      <!-- RESIZER 1 -->
+      <div class="resizer-handle" (mousedown)="startResizingDMS($event)" *ngIf="!isPortalMode"></div>
 
-      <form [formGroup]="form" (ngSubmit)="onSubmit()" class="dynamic-form">
-        <div *ngFor="let field of fields" 
-             class="field-container" 
-             [class.field-highlight]="highlightId === field.id"
-             (mouseenter)="fieldHovered.emit(field.id)"
-             (mouseleave)="fieldHovered.emit(null)">
-          
-          <ng-container [ngSwitch]="field.type">
-            
-            <mat-form-field *ngSwitchCase="'text'" appearance="outline" class="full-width premium-field">
-              <mat-label>{{ field.label }}</mat-label>
-              <input matInput [formControlName]="field.id" [required]="field.required">
-            </mat-form-field>
+      <!-- FORM PANEL -->
+      <main class="form-panel">
+          <div class="form-container-scroll scroll-custom">
+              <header class="header-box">
+                  <h1>Gestión <span>Premium</span></h1>
+                  <p>Atención de Solicitud #{{ instancia?.codigoSeguimiento || 'UAGRM-PROCESO' }}</p>
+              </header>
 
-            <mat-form-field *ngSwitchCase="'email'" appearance="outline" class="full-width premium-field">
-              <mat-label>{{ field.label }}</mat-label>
-              <input matInput type="email" [formControlName]="field.id" [required]="field.required" placeholder="ejemplo@correo.com">
-              <mat-icon matSuffix>email</mat-icon>
-            </mat-form-field>
+              <form [formGroup]="form" (ngSubmit)="onSubmit()">
+                  <div *ngFor="let field of fields" class="field-group" 
+                      [class.active-highlight]="highlightId === field.id"
+                      [class.field-readonly]="field.readOnly"
+                      [class.field-rejected]="esCampoObservado(field.id)"
+                      (mouseenter)="fieldHovered.emit(field.id)"
+                      (mouseleave)="fieldHovered.emit(null)">
+                  
+                  <div class="field-header">
+                      <label>{{ field.label }}</label>
+                      <div class="field-status-actions">
+                          <span class="status-tag" *ngIf="field.estado" [class]="field.estado.toLowerCase()">
+                              {{ field.estado }}
+                          </span>
+                      </div>
+                  </div>
 
-            <mat-form-field *ngSwitchCase="'textarea'" appearance="outline" class="full-width premium-field">
-              <mat-label>{{ field.label }}</mat-label>
-              <textarea matInput [formControlName]="field.id" [required]="field.required" rows="2"></textarea>
-            </mat-form-field>
+                  <div class="observation-motive animate-fade-in" *ngIf="field.motivo || esCampoObservado(field.id)">
+                      <mat-icon>warning</mat-icon>
+                      <span>{{ field.motivo || getMotivoCampo(field.id) }}</span>
+                  </div>
+                  
+                  <ng-container [ngSwitch]="field.type">
+                      <input *ngSwitchCase="'text'" type="text" [formControlName]="field.id" [readonly]="field.readOnly" (focus)="onFieldFocus(field.id)" [placeholder]="field.label">
+                      <input *ngSwitchCase="'number'" type="number" [formControlName]="field.id" [readonly]="field.readOnly" (focus)="onFieldFocus(field.id)">
+                      <input *ngSwitchCase="'date'" type="date" [formControlName]="field.id" [readonly]="field.readOnly" (focus)="onFieldFocus(field.id)">
+                      <select *ngSwitchCase="'select'" [formControlName]="field.id" [attr.disabled]="field.readOnly ? '' : null" (focus)="onFieldFocus(field.id)" class="clickable-select">
+                          <option value="">Seleccione...</option>
+                          <option *ngFor="let opt of field.options" [value]="opt">{{ opt }}</option>
+                      </select>
+                      <textarea *ngSwitchCase="'textarea'" [formControlName]="field.id" [readonly]="field.readOnly" (focus)="onFieldFocus(field.id)" [placeholder]="field.label"></textarea>
+                      <div *ngSwitchCase="'file'" class="file-upload-wrapper" [class.uploading]="uploadingField === field.id" [class.upload-disabled]="field.readOnly">
+                          <input type="file" (change)="onFileChange($event, field.id)" [disabled]="field.readOnly" class="file-input-dynamic">
+                          <div class="file-dummy">
+                              <mat-icon *ngIf="!uploadingField && !form.get(field.id)?.value">cloud_upload</mat-icon>
+                              <mat-icon *ngIf="form.get(field.id)?.value" style="color: #22c55e;">check_circle</mat-icon>
+                              <mat-progress-spinner *ngIf="uploadingField === field.id" mode="indeterminate" diameter="24"></mat-progress-spinner>
+                              <span *ngIf="field.readOnly" style="color: #22c55e;">DOCUMENTO APROBADO</span>
+                              <span *ngIf="!field.readOnly">{{ form.get(field.id)?.value ? 'Documento cargado' : (uploadingField === field.id ? 'Subiendo...' : 'Subir archivo requerido') }}</span>
+                          </div>
+                      </div>
+                  </ng-container>
+                  </div>
+                  <div class="actions">
+                      <button type="button" class="btn-finish-gestión" [disabled]="!form.valid" (click)="onSubmit()">
+                          {{ isPortalMode ? (instancia?.id ? 'ENVIAR CORRECCIONES' : 'ENVIAR SOLICITUD') : 'FINALIZAR GESTIÓN Y CONTINUAR' }} <mat-icon>chevron_right</mat-icon>
+                      </button>
+                  </div>
+              </form>
+          </div>
+          <div class="async-evidence-loader animate-pop-in" *ngIf="cargandoEvidencias">
+              <mat-progress-bar mode="indeterminate" class="loader-blue"></mat-progress-bar>
+              <p>Buscando origen de las respuestas en documentos...</p>
+          </div>
+      </main>
 
-            <mat-form-field *ngSwitchCase="'number'" appearance="outline" class="full-width premium-field">
-              <mat-label>{{ field.label }}</mat-label>
-              <input matInput type="number" [formControlName]="field.id" [required]="field.required">
-            </mat-form-field>
+      <!-- RESIZER 2 -->
+      <div class="resizer-handle" (mousedown)="startResizingPanels($event)" *ngIf="!isPortalMode && !isDesignMode"></div>
 
-            <mat-form-field *ngSwitchCase="'date'" appearance="outline" class="full-width premium-field">
-              <mat-label>{{ field.label }}</mat-label>
-              <input matInput [matDatepicker]="picker" [formControlName]="field.id" (click)="picker.open()" readonly>
-              <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
-              <mat-datepicker #picker></mat-datepicker>
-            </mat-form-field>
+      <!-- EVIDENCE PANEL -->
+      <section class="evidence-panel" (wheel)="onMouseWheel($event)" *ngIf="!isPortalMode && !isDesignMode">
+          <div class="viewer-head">
+              <div class="head-left" style="display: flex; align-items: center; gap: 15px;">
+                  <span class="title">EVIDENCIA: {{ selectedDoc?.nombreArchivo || 'Ninguno' }}</span>
+                  
+                  <!-- CÁPSULA DE VERSIÓN ANTIGUA -->
+                  <div class="old-version-capsule" *ngIf="selectedDoc && !selectedDoc.esActual">
+                      <mat-icon>history</mat-icon>
+                      <span>VIENDO VERSIÓN ANTERIOR (V{{ selectedDoc.version }})</span>
+                  </div>
 
-            <mat-form-field *ngSwitchCase="'select'" appearance="outline" class="full-width premium-field">
-              <mat-label>{{ field.label }}</mat-label>
-              <mat-select [formControlName]="field.id">
-                <mat-option *ngFor="let opt of field.options" [value]="opt">{{ opt }}</mat-option>
-              </mat-select>
-            </mat-form-field>
-
-            <div *ngSwitchCase="'file'" class="file-premium-container">
-              <label class="file-label">{{ field.label }} <span *ngIf="field.required" class="req">*</span></label>
-              <div class="file-input-wrapper">
-                <button type="button" class="btn-file-trigger" (click)="f.click()">
-                  <mat-icon>cloud_upload</mat-icon>
-                  {{ fileName[field.id] || 'Seleccionar Documento' }}
-                </button>
-                <input type="file" #f (change)="onFileChange($event, field.id)" hidden>
+                  <button class="btn-subsanar-premium" *ngIf="!isPortalMode && !isDesignMode && taskInstanceId" (click)="abrirConfiguradorSubsanacion()">
+                      <mat-icon>rule</mat-icon> <span>SOLICITAR CORRECCIÓN</span>
+                  </button>
               </div>
-            </div>
+              <div class="viewer-tools-premium">
+                  <button class="tool-btn-orb focus" (click)="autoFit()" matTooltip="Ajustar al ancho"><mat-icon>aspect_ratio</mat-icon></button>
+                  <div class="tool-group">
+                      <button class="tool-btn-orb zoom" (click)="setZoom(0.1)"><mat-icon>add</mat-icon></button>
+                      <div class="zoom-percent">{{ (zoomLevel * 100).toFixed(0) }}%</div>
+                      <button class="tool-btn-orb zoom" (click)="setZoom(-0.1)"><mat-icon>remove</mat-icon></button>
+                  </div>
+              </div>
+          </div>
+          <div class="canvas-area" (click)="onCanvasClick()">
+              <div class="doc-viewer-content scroll-custom" *ngIf="selectedDoc" #viewerContent>
+                  <div class="layers-container" [style.transform]="'scale(' + zoomLevel + ')'" (click)="$event.stopPropagation()">
+                      <img *ngIf="!isPdf && !isTxt" [src]="selectedDoc.urlS3 | safeUrl" class="doc-img">
+                      <div class="transparent-highlight-layer" *ngIf="!isPdf && !isTxt">
+                          <ng-container *ngFor="let h of highlightsIA">
+                              <div *ngIf="h.docId === selectedDoc.id && (mostrarTodoIA || h.fieldId === activeFieldId)" class="ai-highlight-box" [class.active-highlight]="h.fieldId === activeFieldId" [style.top.%]="h.coords.y" [style.left.%]="h.coords.x" [style.width.%]="h.coords.w" [style.height.%]="h.coords.h" (click)="onFieldFocus(h.fieldId)">
+                                  <div class="ai-highlight-label">{{ h.label }}</div>
+                              </div>
+                          </ng-container>
+                      </div>
+                  </div>
+                  <iframe *ngIf="isPdf || isTxt" [src]="selectedDoc.urlS3 | safeUrl" width="100%" height="100%" frameborder="0"></iframe>
+              </div>
+              <div class="empty-viewer" *ngIf="!selectedDoc">
+                  <mat-icon style="font-size: 48px; width: 48px; height: 48px; color: var(--glass-border);">search</mat-icon>
+                  <p style="color: var(--text-muted); font-size: 12px; margin-top: 10px;">Seleccione un documento para ver evidencia</p>
+              </div>
+          </div>
+      </section>
+  </ng-container>
 
-            <div *ngSwitchCase="'button'" class="button-field-wrapper">
-               <button mat-raised-button class="btn-custom-action" type="button" (click)="onSubmit()">
-                 {{ field.label }}
-               </button>
-            </div>
+  <!-- MODO EDITOR COLABORATIVO (OCUPA EL RESTO) -->
+  <section class="documento-colaborativo-area animate-fade-in" *ngIf="selectedDoc?.esColaborativo">
+      <app-document-editor 
+        [instanciaId]="instancia?.id" 
+        [selectedDocument]="selectedDoc" 
+        [contextoJson]="form.value"
+        [instancia]="instancia"
+        (completed)="handleDocFinalized()" 
+        (cancelled)="selectedDoc = null">
+      </app-document-editor>
+  </section>
 
-          </ng-container>
-        </div>
+  <!-- CONTEXT MENU PARA VERSIONES -->
+  <div class="custom-context-menu animate-pop-in" *ngIf="contextMenuVisible" 
+       [style.left.px]="contextMenuX" [style.top.px]="contextMenuY">
+      <div class="menu-item" (click)="toggleVersionesArbol(contextMenuDoc.id)">
+          <mat-icon>history</mat-icon>
+          <span>{{ expandedDocs.has(contextMenuDoc.id) ? 'Ocultar Historial' : 'Ver Historial de Versiones' }}</span>
+      </div>
+  </div>
 
-        <div class="form-actions" *ngIf="fields.length > 0 && !hasCustomButtons()">
-          <button mat-raised-button class="btn-save-form" type="submit">
-            GUARDAR Y CONTINUAR <mat-icon>chevron_right</mat-icon>
-          </button>
-        </div>
-        
-        <div class="empty-preview" *ngIf="fields.length === 0">
-           <mat-icon>extension</mat-icon>
-           <p>Diseña los campos para ver el formulario</p>
-        </div>
-      </form>
-    </div>
+  <!-- MODALES Y OVERLAYS -->
+  <div class="info-overlay-premium" *ngIf="showDocInfo" (click)="showDocInfo = false">
+      <div class="info-card-premium animate-pop-in" (click)="$event.stopPropagation()">
+          <header><mat-icon>info</mat-icon><span>DETALLES DEL ORIGEN</span></header>
+          <div class="info-body">
+              <div class="info-item"><label>CREADO POR</label><span>{{ docInfoTarget?.funcionarioNombre }}</span></div>
+              <div class="info-item"><label>DEPARTAMENTO</label><span>{{ docInfoTarget?.departamentoNombre }}</span></div>
+              <div class="info-item"><label>FECHA Y HORA</label><span>{{ docInfoTarget?.fechaSubida | date:'dd/MM/yyyy HH:mm:ss' }}</span></div>
+          </div>
+          <button (click)="showDocInfo = false">ENTENDIDO</button>
+      </div>
+  </div>
+
+  <div class="modal-overlay" *ngIf="mostrarConfigurador">
+      <div class="configurator-card animate-pop-in">
+          <div class="card-header"><h2>Configurar Subsanación</h2><p>Seleccione qué datos debe corregir el ciudadano.</p></div>
+          <div class="card-body scroll-custom">
+              <div *ngFor="let cf of configuradorCampos" class="client-field-row" [class.is-rejected]="cf.observado">
+                  <div class="field-head">
+                      <div class="field-info"><span class="field-label">{{ cf.label }}</span><span class="field-type">TIPO: {{ cf.type | uppercase }}</span></div>
+                      <div class="toggle-container"><span class="status-badge" [class.bad]="cf.observado" [class.ok]="!cf.observado">{{ cf.observado ? 'OBSERVADO' : 'APROBADO' }}</span><label class="switch"><input type="checkbox" [(ngModel)]="cf.observado"><span class="slider"></span></label></div>
+                  </div>
+                  <div class="motive-box" *ngIf="cf.observado"><textarea [(ngModel)]="cf.motivo" placeholder="Escriba el motivo..."></textarea></div>
+              </div>
+          </div>
+          <div class="card-footer"><button class="btn btn-cancel" (click)="cerrarConfigurador()">CANCELAR</button><button class="btn btn-send" (click)="enviarSubsanacion()">ENVIAR</button></div>
+      </div>
+  </div>
+</div>

@@ -22,7 +22,7 @@ public class DepartamentoController {
 
     @PostMapping
     public ResponseEntity<Departamento> guardarOActualizar(@RequestBody Departamento departamento) {
-        return ResponseEntity.ok(service.guardarOActualizar(departamento));
+        return ResponseEntity.ok(service.guardar(departamento));
     }
 
     @DeleteMapping("/{id}")

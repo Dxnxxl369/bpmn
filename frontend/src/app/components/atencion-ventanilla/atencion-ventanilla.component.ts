@@ -27,11 +27,16 @@ export class AtencionVentanillaComponent implements OnInit {
   misDepartamentosIds: string[] = [];
   politicaSeleccionada: PoliticaNegocio | null = null;
   schema: string = '[]';
+  taskIdActual: string = '';
   fileUploaded: boolean = false;
   fileName: string = '';
   procesandoIA: boolean = false;
   respuestasIA: any = null;
   instruccionEjecutivo: string = '';
+
+  // --- IDENTIFICACIÓN PASO 0 ---
+  identificado: boolean = false;
+  ciCiudadano: string = '';
 
   constructor(
     public dialogRef: MatDialogRef<AtencionVentanillaComponent>,
@@ -40,6 +45,15 @@ export class AtencionVentanillaComponent implements OnInit {
     private snackBar: MatSnackBar,
     private cdr: ChangeDetectorRef
   ) {}
+
+  confirmarIdentidad() {
+    if (!this.ciCiudadano || this.ciCiudadano.length < 5) {
+      this.snackBar.open('Ingrese un C.I. válido', 'OK', { duration: 2000 });
+      return;
+    }
+    this.identificado = true;
+    this.cdr.detectChanges();
+  }
 
   ngOnInit() {
     this.authService.user$.subscribe((user: any) => {
@@ -127,6 +141,7 @@ export class AtencionVentanillaComponent implements OnInit {
       next: (tareas) => {
         if (tareas && tareas.length > 0) {
           const primeraTarea = tareas[0];
+          this.taskIdActual = primeraTarea.id;
           console.log("DEBUG: Cargando formulario para primera tarea:", primeraTarea.nombre, "ID:", primeraTarea.id);
           this.bpmsService.generarFormulario(p.id!, primeraTarea.id).subscribe({
             next: (schema) => {
@@ -147,12 +162,21 @@ export class AtencionVentanillaComponent implements OnInit {
     });
   }
 
+  fileUrl: string | null = null;
+
   onFileSelected(event: any) {
     const file = event.target.files[0];
     if (file) {
       this.fileUploaded = true;
       this.fileName = file.name;
-      this.cdr.detectChanges();
+      
+      // Generate URL for preview
+      const reader = new FileReader();
+      reader.onload = (e: any) => {
+        this.fileUrl = e.target.result;
+        this.cdr.detectChanges();
+      };
+      reader.readAsDataURL(file);
     }
   }
 
@@ -181,7 +205,8 @@ export class AtencionVentanillaComponent implements OnInit {
     
     const userEmail = this.authService.getEmail();
     
-    this.bpmsService.iniciarTramitePresencial(this.politicaSeleccionada.id, JSON.stringify(respuestas), userEmail).subscribe({
+    // Pasamos el ciCiudadano capturado en el Paso 0
+    this.bpmsService.iniciarTramitePresencial(this.politicaSeleccionada.id, JSON.stringify(respuestas), this.ciCiudadano, userEmail).subscribe({
       next: () => {
         this.snackBar.open('🚀 Trámite iniciado con éxito.', 'OK', { duration: 5000 });
         this.dialogRef.close(true);
@@ -192,5 +217,13 @@ export class AtencionVentanillaComponent implements OnInit {
         this.snackBar.open(`❌ ${errorMsg}`, 'Cerrar', { duration: 7000, panelClass: ['snack-error-premium'] });
       }
     });
+  }
+
+  resetVentanilla() {
+    this.politicaSeleccionada = null;
+    this.identificado = false;
+    this.ciCiudadano = '';
+    this.schema = '[]';
+    this.cdr.detectChanges();
   }
 }

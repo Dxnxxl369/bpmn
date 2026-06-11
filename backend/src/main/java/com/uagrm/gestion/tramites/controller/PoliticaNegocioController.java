@@ -28,58 +28,80 @@ public class PoliticaNegocioController {
     private final PoliticaNegocioService service;
     private final DocumentProcessorService documentProcessorService;
     private final AIOrchestratorService aiOrchestratorService;
+    private final com.uagrm.gestion.tramites.service.AuditoriaService auditoriaService;
+    private final com.uagrm.gestion.tramites.repository.DocumentoRepository documentoRepository;
 
     @PostMapping("/procesar-documento")
     public ResponseEntity<List<PoliticaNegocio>> procesarDocumento(@RequestParam("archivo") MultipartFile archivo) throws IOException {
+        auditoriaService.registrar(null, null, "GENERAR_IA_PDF", "DISEÑADOR", "PDF", "Archivo: " + archivo.getOriginalFilename());
+        
+        // 1. Persistir el documento origen (PDF) para trazabilidad
+        com.uagrm.gestion.tramites.model.Documento doc = new com.uagrm.gestion.tramites.model.Documento();
+        doc.setNombreArchivo(archivo.getOriginalFilename());
+        doc.setTipoDocumento("ORIGEN_POLITICA");
+        doc.setFechaSubida(java.time.Instant.now());
+        doc.setUrlS3("s3://tramites-uagrm/disenos/" + archivo.getOriginalFilename()); // Mock S3
+        doc = documentoRepository.save(doc);
+
         String texto = documentProcessorService.extractTextFromPdf(archivo);
-        return ResponseEntity.ok(generarPoliticasDesdeTexto(texto, archivo.getOriginalFilename()));
+        return ResponseEntity.ok(generarPoliticasDesdeTexto(texto, "PDF", doc.getId()));
     }
 
     @PostMapping("/texto")
     public ResponseEntity<List<PoliticaNegocio>> procesarTexto(@RequestBody Map<String, String> payload) {
+        auditoriaService.registrar(null, null, "GENERAR_IA_PROMPT", "DISEÑADOR", "PROMPT", "Generación por texto manual");
         String texto = payload.get("texto");
         if (texto == null || texto.trim().isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
-        return ResponseEntity.ok(generarPoliticasDesdeTexto(texto, "texto manual"));
+        return ResponseEntity.ok(generarPoliticasDesdeTexto(texto, "PROMPT", null));
     }
 
-    private List<PoliticaNegocio> generarPoliticasDesdeTexto(String texto, String fuente) {
-        List<String> nombresProcesos = aiOrchestratorService.analyzeAndExtractProcesses(texto);
+    private List<PoliticaNegocio> generarPoliticasDesdeTexto(String texto, String origenTipo, String docId) {
+        // ETAPA 1: DESCUBRIMIENTO (Censo de procesos y fragmentos)
+        List<Map<String, String>> descubrimientos = aiOrchestratorService.discoverProcesses(texto, origenTipo);
         List<PoliticaNegocio> politicasGeneradas = new ArrayList<>();
 
-        log.info("Iniciando generación masiva para {} procesos detectados.", nombresProcesos.size());
+        log.info("Iniciando orquestación atómica para {} trámites detectados.", descubrimientos.size());
 
-        for (String nombre : nombresProcesos) {
+        for (Map<String, String> disc : descubrimientos) {
+            String nombre = disc.get("nombre");
+            String fragmento = disc.get("fragmento");
+
             try {
-                // FASE 1: Pausa de cortesía para evitar Rate Limits de la API
-                if (!politicasGeneradas.isEmpty()) {
-                    log.info("Esperando 2 segundos para la siguiente solicitud a la IA...");
-                    Thread.sleep(2500); 
-                }
+                // Pequeño retardo para evitar saturar la API
+                if (!politicasGeneradas.isEmpty()) Thread.sleep(2000); 
 
-                log.info("Generando diagrama para: {}", nombre);
-                String xml = aiOrchestratorService.generateBPMNXml(nombre, texto);
+                log.info("Generando XML UML para: {}", nombre);
+                
+                // ETAPA 2: GENERACIÓN ATÓMICA (XML Puro por proceso)
+                String xml = aiOrchestratorService.generatePureUmlXml(nombre, fragmento);
                 
                 if (xml == null || xml.isBlank()) {
-                    log.warn("La IA devolvió un XML vacío para {}, reintentando una vez...", nombre);
-                    Thread.sleep(3000);
-                    xml = aiOrchestratorService.generateBPMNXml(nombre, texto);
+                    log.warn("XML vacío para {}, reintentando con contexto completo...", nombre);
+                    xml = aiOrchestratorService.generatePureUmlXml(nombre, texto);
                 }
 
                 if (xml != null && !xml.isBlank()) {
                     PoliticaNegocio nuevaPolitica = new PoliticaNegocio();
                     nuevaPolitica.setNombre(nombre);
-                    nuevaPolitica.setDescripcion("Generado automáticamente por IA Orchestrator.");
                     nuevaPolitica.setXmlBpmn(xml);
                     nuevaPolitica.setEstado(EstadoPolitica.BORRADOR);
                     
+                    // ADN del Proceso (Para TensorFlow y Trazabilidad)
+                    nuevaPolitica.setOrigenTipo(origenTipo);
+                    nuevaPolitica.setOrigenContenido(fragmento);
+                    nuevaPolitica.setDocumentoOrigenId(docId);
+                    
+                    // Descripción técnica básica
+                    nuevaPolitica.setDescripcion("Proceso de " + nombre + " orquestado automáticamente desde " + origenTipo + ".");
+                    
                     politicasGeneradas.add(nuevaPolitica);
-                    log.info("Proceso {} generado (en memoria).", nombre);
+                    log.info("✅ Trámite '{}' completado.", nombre);
                 }
 
             } catch (Exception e) {
-                log.error("Fallo crítico al generar el proceso {}: {}", nombre, e.getMessage());
+                log.error("Fallo en orquestación de {}: {}", nombre, e.getMessage());
             }
         }
         return politicasGeneradas;
@@ -127,7 +149,7 @@ public class PoliticaNegocioController {
 
     @PutMapping("/{id}/xml")
     public ResponseEntity<Void> guardarXml(@PathVariable String id, @RequestBody String xml) {
-        service.actualizarXml(id, xml);
+        service.actualizarXml(id, xml, "DISEÑADOR");
         return ResponseEntity.ok().build();
     }
 
@@ -150,7 +172,7 @@ public class PoliticaNegocioController {
     }
 
     @PostMapping("/{id}/versiones/{versionId}/restaurar")
-    public ResponseEntity<PoliticaNegocio> restaurarVersion(@PathVariable String id, @PathVariable String versionId) {
-        return ResponseEntity.ok(service.restaurarVersion(id, versionId));
+    public ResponseEntity<PoliticaNegocio> restaurarVersion(@PathVariable String id, @PathVariable String versionId, @RequestParam(required = false) String autor) {
+        return ResponseEntity.ok(service.restaurarVersion(id, versionId, autor));
     }
 }

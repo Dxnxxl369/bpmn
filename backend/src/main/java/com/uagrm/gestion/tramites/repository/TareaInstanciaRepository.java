@@ -8,4 +8,5 @@ public interface TareaInstanciaRepository extends MongoRepository<TareaInstancia
     List<TareaInstancia> findByLaneIdAndEstado(String laneId, String estado);
     List<TareaInstancia> findByLaneIdInAndEstado(List<String> laneIds, String estado);
     List<TareaInstancia> findByInstanciaProcesoId(String instanciaProcesoId);
+    List<TareaInstancia> findByInstanciaProcesoIdAndEstado(String instanciaProcesoId, String estado);
 }

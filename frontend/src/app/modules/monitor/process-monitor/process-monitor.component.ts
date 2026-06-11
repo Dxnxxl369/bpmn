@@ -64,6 +64,7 @@ export class ProcessMonitorComponent implements OnInit {
   constructor(private bpmsService: BpmsService) {}
 
   ngOnInit() {
+    this.bpmsService.registrarAuditoria('ACCESO_MODULO', 'MONITOR GLOBAL', 'MAIN', 'Entró al monitor de procesos').subscribe();
     this.bpmsService.listarPoliticas().subscribe(data => this.politicas = data);
     // TODO: Llamar al backend para listar instancias en curso
   }

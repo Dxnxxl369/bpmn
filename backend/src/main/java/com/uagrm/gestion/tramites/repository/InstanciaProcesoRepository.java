@@ -7,4 +7,5 @@ import java.util.List;
 public interface InstanciaProcesoRepository extends MongoRepository<InstanciaProceso, String> {
     List<InstanciaProceso> findByEstado(String estado);
     java.util.Optional<InstanciaProceso> findByCodigoSeguimiento(String codigoSeguimiento);
+    java.util.Optional<InstanciaProceso> findFirstByClienteCiAndPoliticaNegocioIdAndEstadoIn(String clienteCi, String politicaId, List<String> estados);
 }

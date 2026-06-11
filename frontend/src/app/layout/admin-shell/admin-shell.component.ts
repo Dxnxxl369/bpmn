@@ -5,26 +5,21 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatBadgeModule } from '@angular/material/badge';
 import { AuthService } from '../../services/auth.service';
-import { BpmsService } from '../../services/bpms.service';
 import { CollaborationService, ChatMessage } from '../../services/collaboration.service';
 import { AiAssistantService } from '../../services/ai-assistant.service';
 import { AiAssistantComponent } from '../../components/ai-assistant/ai-assistant.component';
-import { CollaborativeCursorsComponent } from '../../components/collaborative-cursors/collaborative-cursors.component';
 import { Subscription, filter } from 'rxjs';
 import { FormsModule } from '@angular/forms';
-
 import { MatDialog } from '@angular/material/dialog';
+import { BpmsService } from '../../services/bpms.service';
 
 @Component({
   selector: 'app-admin-shell',
   standalone: true,
-  imports: [CommonModule, RouterModule, MatIconModule, MatTooltipModule, MatBadgeModule, AiAssistantComponent, CollaborativeCursorsComponent, FormsModule],
+  imports: [CommonModule, RouterModule, MatIconModule, MatTooltipModule, MatBadgeModule, AiAssistantComponent, FormsModule],
   template: `
     <div class="admin-shell-layout" [class.dark-shell]="isDarkMode" [class.sidebar-collapsed]="isCollapsed">
       
-      <app-collaborative-cursors></app-collaborative-cursors>
-      
-      <!-- SIDEBAR INTEGRAL -->
       <aside class="admin-sidebar">
         <div class="sidebar-brand">
           <div class="brand-orb"><mat-icon>hub</mat-icon></div>
@@ -42,6 +37,9 @@ import { MatDialog } from '@angular/material/dialog';
             <a routerLink="designer" routerLinkActive="active-nav" class="nav-item" matTooltip="Diseñador IA" [matTooltipDisabled]="!isCollapsed">
               <mat-icon>architecture</mat-icon> <span *ngIf="!isCollapsed">Diseñador IA</span>
             </a>
+            <a routerLink="reports" routerLinkActive="active-nav" class="nav-item" matTooltip="Cuellos de Botella" [matTooltipDisabled]="!isCollapsed">
+              <mat-icon>hourglass_empty</mat-icon> <span *ngIf="!isCollapsed">Cuellos de Botella</span>
+            </a>
             <a routerLink="departments" routerLinkActive="active-nav" class="nav-item" matTooltip="Departamentos" [matTooltipDisabled]="!isCollapsed">
               <mat-icon>domain</mat-icon> <span *ngIf="!isCollapsed">Departamentos</span>
             </a>
@@ -51,46 +49,41 @@ import { MatDialog } from '@angular/material/dialog';
             <a routerLink="monitor" routerLinkActive="active-nav" class="nav-item" matTooltip="Monitor Global" [matTooltipDisabled]="!isCollapsed">
               <mat-icon>monitor_heart</mat-icon> <span *ngIf="!isCollapsed">Monitor Global</span>
             </a>
-            <a routerLink="reports" routerLinkActive="active-nav" class="nav-item" matTooltip="Eficiencia" [matTooltipDisabled]="!isCollapsed">
-              <mat-icon>query_stats</mat-icon> <span *ngIf="!isCollapsed">Reportes Eficiencia</span>
+            <a routerLink="reportes-ia" routerLinkActive="active-nav" class="nav-item" matTooltip="Reportes IA" [matTooltipDisabled]="!isCollapsed">
+              <mat-icon>assessment</mat-icon> <span *ngIf="!isCollapsed">Reportes IA</span>
+            </a>
+            <a routerLink="bitacora" routerLinkActive="active-nav" class="nav-item" matTooltip="Bitácora" [matTooltipDisabled]="!isCollapsed">
+              <mat-icon>history_edu</mat-icon> <span *ngIf="!isCollapsed">Bitácora</span>
             </a>
           </ng-container>
 
-          <!-- ÁREA OPERATIVA SOLO PARA FUNCIONARIOS -->
-          <a routerLink="monitor-ejecutivo" *ngIf="userRole === 'FUNCIONARIO'"
-             routerLinkActive="active-nav" class="nav-item" matTooltip="Área Operativa" [matTooltipDisabled]="!isCollapsed">
-            <mat-icon>dashboard</mat-icon> <span *ngIf="!isCollapsed">Área Operativa</span>
-          </a>
+          <!-- NAVEGACIÓN PARA FUNCIONARIO -->
+          <ng-container *ngIf="userRole === 'FUNCIONARIO'">
+            <a routerLink="monitor-ejecutivo" routerLinkActive="active-nav" class="nav-item" matTooltip="Mi Monitor" [matTooltipDisabled]="!isCollapsed">
+              <mat-icon>terminal</mat-icon> <span *ngIf="!isCollapsed">Mi Monitor</span>
+            </a>
+          </ng-container>
 
           <a routerLink="profile" routerLinkActive="active-nav" class="nav-item" matTooltip="Mi Perfil" [matTooltipDisabled]="!isCollapsed">
             <mat-icon>account_circle</mat-icon> <span *ngIf="!isCollapsed">Mi Perfil</span>
           </a>
         </nav>
 
-        <!-- UTILIDADES DE SISTEMA REUBICADAS (NOTIFICACIONES Y CHAT) -->
         <div class="sidebar-utilities">
-          <div class="util-group" [class.collapsed]="isCollapsed">
-            <button class="util-orb neon-box" matTooltip="Notificaciones">
-              <mat-icon>notifications</mat-icon>
-            </button>
-
-            <button class="util-orb hub-trigger" 
-                    [class.active]="showSocialHub" 
-                    [class.has-news]="unreadMessages > 0"
-                    (click)="showSocialHub = !showSocialHub"
-                    matTooltip="Hub de Colaboración">
+          <div class="live-team-trigger" [class.active]="showSocialHub" (click)="showSocialHub = !showSocialHub">
+            <div class="live-indicator-wrapper">
               <mat-icon>groups</mat-icon>
-            </button>
+              <span class="online-dot-pulse" *ngIf="onlineUsers.length > 0"></span>
+            </div>
+            <div class="live-team-label" *ngIf="!isCollapsed">
+              <span>Equipo en vivo</span>
+              <small>{{ filteredUsers.length }} activos</small>
+            </div>
+            <span class="unread-badge" *ngIf="unreadMessages > 0">{{ unreadMessages }}</span>
           </div>
         </div>
 
-
         <div class="sidebar-footer">
-          <button class="theme-mini-btn" (click)="toggleTheme()">
-            <mat-icon>{{ isDarkMode ? 'light_mode' : 'dark_mode' }}</mat-icon>
-            <span *ngIf="!isCollapsed">{{ isDarkMode ? 'Modo Claro' : 'Modo Oscuro' }}</span>
-          </button>
-          
           <div class="user-mini-card">
             <div class="mini-avatar-circular" [style.background-image]="'url(' + myAvatar + ')'" [class.with-img]="myAvatar">
                <span *ngIf="!myAvatar">{{ userName.charAt(0) }}</span>
@@ -99,119 +92,116 @@ import { MatDialog } from '@angular/material/dialog';
               <strong>{{ userName }}</strong>
               <small>{{ userRole }}</small>
             </div>
-            <button class="logout-icon-btn" (click)="logout()" matTooltip="Cerrar Sesión" *ngIf="!isCollapsed">
-               <mat-icon>power_settings_new</mat-icon>
-            </button>
           </div>
+          
+          <!-- BOTÓN MODO CLARO/OSCURO -->
+          <button class="theme-toggle-orb" (click)="toggleTheme()" matTooltip="Cambiar Tema">
+            <mat-icon>{{ isDarkMode ? 'light_mode' : 'dark_mode' }}</mat-icon>
+          </button>
+
+          <button class="logout-icon-btn-final" (click)="logout()" *ngIf="!isCollapsed">
+             <mat-icon>power_settings_new</mat-icon> SALIR
+          </button>
         </div>
       </aside>
 
       <section class="main-content-wrapper">
-        <!-- LIENZO 100% LIMPIO SIN NAVBAR SUPERIOR -->
-        <main class="admin-main">
-          <router-outlet></router-outlet>
-        </main>
+        <main class="admin-main"><router-outlet></router-outlet></main>
       </section>
 
+      <!-- HUB SOCIAL PREMIUM (COLABORADORES Y CHAT) -->
       <aside class="social-hub-drawer" [class.open]="showSocialHub">
-        <header class="drawer-header" *ngIf="!selectedUser">
-          <h3>Equipo <span>en vivo</span></h3>
-          <button class="close-btn-danger" (click)="showSocialHub = false">
+        <header class="drawer-header-premium">
+          <div class="header-left">
+             <mat-icon>diversity_3</mat-icon>
+             <h3>Equipo <span>en vivo</span></h3>
+          </div>
+          <button class="close-btn-danger-pro" (click)="showSocialHub = false">
             <mat-icon>close</mat-icon>
           </button>
         </header>
 
-        <header class="chat-navbar-pro animate-fade-in" *ngIf="selectedUser">
-           <div class="nav-left-box">
-              <button class="back-btn-pro" (click)="selectedUser = null">
-                 <mat-icon>arrow_back</mat-icon>
-              </button>
-              <div class="user-status-box">
-                 <div class="avatar-mini-pro" [style.background-image]="'url(' + selectedUser.avatar + ')'" [class.with-img]="selectedUser.avatar">
-                    <span *ngIf="!selectedUser.avatar">{{ selectedUser.userName.charAt(0) }}</span>
-                 </div>
-                 <div class="status-info">
-                    <strong>{{ selectedUser.userName }}</strong>
-                    <small>En línea</small>
-                 </div>
-              </div>
-           </div>
-           <button class="close-btn-danger mini-pro" (click)="showSocialHub = false">
-             <mat-icon>close</mat-icon>
-           </button>
-        </header>
-
-        <div class="drawer-main-content" *ngIf="!selectedUser">
-          <div class="drawer-tabs-pro">
-            <button [class.active]="activeTab === 'users'" (click)="activeTab = 'users'">EN LÍNEA</button>
-            <button [class.active]="activeTab === 'chat'" (click)="activeTab = 'chat'">
-              CHATS <span class="badge-mini" *ngIf="unreadMessages > 0">{{ unreadMessages }}</span>
-            </button>
-          </div>
-
-          <div class="scroll-area-pro scroll-custom-mini" *ngIf="activeTab === 'users'">
-            <div class="user-card-social animate-pop-in" *ngFor="let user of filteredUsers">
-              <div class="user-avatar-box">
-                <div class="avatar-circle" [style.background-image]="'url(' + user.avatar + ')'" [class.with-img]="user.avatar">
-                  <span *ngIf="!user.avatar">{{ user.userName.charAt(0) }}</span>
-                </div>
-                <span class="status-dot"></span>
-              </div>
-              <div class="user-detail">
-                <strong>{{ user.userName }}</strong>
-                <div class="activity-tag">
-                   <mat-icon>{{ user.activityIcon || 'sensors' }}</mat-icon>
-                   <div class="marquee-container">
-                      <span class="marquee-text-pro">{{ user.activity || 'Navegando' }}</span>
-                   </div>
-                </div>
-              </div>
-              <button class="chat-btn-mini-pro" (click)="abrirConversacion(user)" matTooltip="Chatear">
-                <mat-icon>chat_bubble</mat-icon>
-              </button>
-            </div>
-          </div>
-          
-          <div class="scroll-area-pro scroll-custom-mini" *ngIf="activeTab === 'chat'">
-             <div *ngFor="let conv of activeConversations" 
-                  class="user-card-social inbox-item animate-pop-in"
-                  (click)="abrirConversacion(conv.user)">
-                <div class="user-avatar-box">
-                  <div class="avatar-circle" [style.background-image]="'url(' + conv.user.avatar + ')'" [class.with-img]="conv.user.avatar">
-                    <span *ngIf="!conv.user.avatar">{{ conv.user.userName.charAt(0) }}</span>
-                  </div>
-                  <span class="unread-dot" *ngIf="conv.unread"></span>
-                </div>
-                <div class="user-detail">
-                  <div class="inbox-header">
-                     <strong>{{ conv.user.userName }}</strong>
-                     <small>{{ conv.lastMessage.timestamp | date:'HH:mm' }}</small>
-                  </div>
-                  <p class="last-msg-text">{{ conv.lastMessage.content }}</p>
-                </div>
-             </div>
-             <div class="empty-social" *ngIf="activeConversations.length === 0">
-                <mat-icon>chat_bubble_outline</mat-icon>
-                <p>No tienes chats activos.</p>
-             </div>
-          </div>
+        <!-- SELECTOR DE PESTAÑAS -->
+        <div class="tabs-navigator-pro">
+          <button [class.active]="activeTab === 'users'" (click)="activeTab = 'users'; selectedUser = null">
+            <mat-icon>sensors</mat-icon> ACTIVOS
+          </button>
+          <button [class.active]="activeTab === 'chat'" (click)="activeTab = 'chat'">
+            <mat-icon [matBadge]="unreadMessages" matBadgeColor="warn" [matBadgeHidden]="unreadMessages === 0">chat_bubble</mat-icon> CHATS
+          </button>
         </div>
 
-        <div class="conversation-view animate-slide-in" *ngIf="selectedUser">
-           <div class="chat-messages-box scroll-custom-mini" #chatScroll>
-              <div *ngFor="let msg of filteredMessages" class="msg-bubble-wrapper" [class.me]="msg.fromId === myEmail">
-                 <div class="msg-bubble-pro" [style.border-left-color]="msg.fromId !== myEmail ? msg.color : 'transparent'">
-                    <p>{{ msg.content }}</p>
-                    <small>{{ msg.timestamp | date:'HH:mm' }}</small>
-                 </div>
+        <div class="drawer-main-content">
+          <!-- PESTAÑA: ACTIVOS -->
+          <div class="scroll-area-premium scroll-custom-mini" *ngIf="activeTab === 'users'">
+            <div class="user-card-premium" *ngFor="let user of filteredUsers">
+              <div class="avatar-ring-pro">
+                <div class="avatar-main" [style.background-image]="'url(' + (user.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + user.userId) + ')'" [class.with-img]="user.avatar">
+                  <span *ngIf="!user.avatar">{{ user.userName.charAt(0) }}</span>
+                </div>
+                <span class="pulse-status"></span>
               </div>
-           </div>
-           <footer class="drawer-footer">
-              <div class="quick-chat-preview">
-                 <input type="text" [(ngModel)]="chatMessage" (keyup.enter)="enviarMensaje()" placeholder="Escribe un mensaje...">
-                 <button (click)="enviarMensaje()" [disabled]="!chatMessage.trim()"><mat-icon>send</mat-icon></button>
+              <div class="user-info-pro">
+                <strong>{{ user.userName }}</strong>
+                <span class="activity-text">{{ user.activity || 'En línea' }}</span>
               </div>
-           </footer>
+              <button class="chat-trigger-btn" (click)="abrirConversacionDesdeActivos(user)">
+                <mat-icon>send</mat-icon>
+              </button>
+            </div>
+            <div class="empty-social-pro" *ngIf="filteredUsers.length === 0">
+               <mat-icon>cloud_off</mat-icon>
+               <p>No hay otros colegas activos.</p>
+            </div>
+          </div>
+
+          <!-- PESTAÑA: CHATS (MESSENGER STYLE) -->
+          <div class="scroll-area-premium scroll-custom-mini" *ngIf="activeTab === 'chat'">
+            <div class="user-card-premium messenger-item" *ngFor="let user of filteredUsers" (click)="abrirConversacion(user)">
+              <div class="avatar-ring-pro">
+                <div class="avatar-main" [style.background-image]="'url(' + user.avatar + ')'" [class.with-img]="user.avatar">
+                  <span *ngIf="!user.avatar">{{ user.userName.charAt(0) }}</span>
+                </div>
+                <span class="unread-dot-mini" *ngIf="unreadSenders.has(user.userId)"></span>
+              </div>
+              <div class="user-info-pro">
+                <div class="user-name-row">
+                  <strong>{{ user.userName }}</strong>
+                </div>
+                <span class="last-msg-preview">{{ getLastMessagePreview(user.userId) || 'Toca para iniciar chat' }}</span>
+              </div>
+              <mat-icon class="chevron-icon">chevron_right</mat-icon>
+            </div>
+            <div class="empty-social-pro" *ngIf="filteredUsers.length === 0">
+               <mat-icon>forum</mat-icon>
+               <p>No tienes chats activos.</p>
+            </div>
+          </div>
+
+          <!-- VISTA DE CHAT PRIVADO (CAPA SUPERIOR - SOLO EN PESTAÑA CHAT) -->
+          <div class="chat-container-premium animate-slide-in" *ngIf="selectedUser && activeTab === 'chat'">
+             <header class="chat-active-header">
+                <button class="back-btn-pro" (click)="selectedUser = null"><mat-icon>arrow_back</mat-icon></button>
+                <div class="header-user-info">
+                   <div class="avatar-mini-pro" [style.background-image]="'url(' + selectedUser.avatar + ')'" [class.with-img]="selectedUser.avatar">
+                      <span *ngIf="!selectedUser.avatar">{{ selectedUser.userName.charAt(0) }}</span>
+                   </div>
+                   <span>{{ selectedUser.userName }}</span>
+                </div>
+             </header>
+             <div class="messages-list scroll-custom-mini" #chatScroll>
+                <div *ngFor="let msg of filteredMessages" class="msg-row" [class.me]="msg.fromId === myEmail">
+                   <div class="bubble-premium">
+                      <p>{{ msg.content }}</p>
+                      <small>{{ msg.timestamp | date:'HH:mm' }}</small>
+                   </div>
+                </div>
+             </div>
+             <footer class="chat-footer-premium">
+                <input type="text" [(ngModel)]="chatMessage" (keyup.enter)="enviarMensaje()" placeholder="Escribe un mensaje...">
+                <button class="send-btn-pro" (click)="enviarMensaje()"><mat-icon>send</mat-icon></button>
+             </footer>
+          </div>
         </div>
       </aside>
 
@@ -219,210 +209,278 @@ import { MatDialog } from '@angular/material/dialog';
     </div>
   `,
   styles: [`
-    .admin-shell-layout { display: flex; height: 100vh; width: 100vw; background: var(--bg-app); overflow: hidden; position: relative; }
+    .admin-shell-layout { display: flex; height: 100vh; width: 100vw; background: var(--bg-app); overflow: hidden; position: relative; font-family: 'Inter', sans-serif; transition: background 0.4s ease; }
     
-    /* SIDEBAR REDISEÑADO CON UTILIDADES */
-    .admin-sidebar { width: 260px; background: var(--surface); border-right: 1px solid var(--glass-border); display: flex; flex-direction: column; transition: 0.3s; z-index: 5000; position: relative; } /* Z-index con position para superar overlays */
+    .admin-sidebar { width: 260px; background: var(--surface); border-right: 1px solid var(--glass-border); display: flex; flex-direction: column; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 5000; position: relative; }
     .sidebar-collapsed .admin-sidebar { width: 80px; }
-    .sidebar-brand { height: 80px; display: flex; align-items: center; padding: 0 20px; gap: 15px; border-bottom: 1px solid var(--glass-border); position: relative; }
-    .brand-orb { min-width: 40px; height: 40px; background: linear-gradient(135deg, var(--primary-color), #e67e22); color: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
-    .brand-text h1 { margin: 0; font-size: 1rem; color: var(--text-main); }
-    .brand-text p { margin: 0; font-size: 0.5rem; font-weight: 900; letter-spacing: 1px; color: var(--text-muted); }
-
-    .toggle-btn-pro { position: absolute; right: -12px; top: 25px; width: 26px; height: 26px; border-radius: 50%; background: var(--primary-color); color: white; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 10; box-shadow: 0 0 10px var(--primary-color); transition: 0.3s; }
-    .toggle-btn-pro:hover { transform: scale(1.2); }
-
-    .sidebar-nav { flex: 1; padding: 20px 10px; display: flex; flex-direction: column; gap: 5px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(211, 84, 0, 0.2) transparent; }
-    .sidebar-nav::-webkit-scrollbar { width: 5px; }
-    .sidebar-nav::-webkit-scrollbar-track { background: transparent; }
-    .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(211, 84, 0, 0); border-radius: 10px; transition: 0.3s; }
-    .sidebar-nav:hover::-webkit-scrollbar-thumb { background: rgba(211, 84, 0, 0.3); }
-    .sidebar-nav::-webkit-scrollbar-thumb:hover { background: var(--primary-color); }
-
-    .nav-item { display: flex; align-items: center; gap: 15px; padding: 12px 15px; text-decoration: none; color: var(--text-muted); border-radius: 12px; font-weight: 700; transition: 0.3s; font-size: 0.85rem; flex-shrink: 0; }
-    .nav-item:hover { background: rgba(211, 84, 0, 0.05); color: var(--primary-color); }
-    .nav-item.active-nav { background: rgba(211, 84, 0, 0.1); color: var(--primary-color); }
-
-    /* SECCIÓN DE UTILIDADES (NUEVO) */
-    .sidebar-utilities { padding: 15px; border-top: 1px solid var(--glass-border); }
-    .util-group { display: flex; gap: 15px; justify-content: center; }
-    .util-group.collapsed { flex-direction: column; align-items: center; gap: 10px; }
     
-    .util-orb { 
-      width: 44px; height: 44px; border-radius: 14px; border: 1px solid var(--glass-border); 
-      background: var(--bg-app); color: var(--text-muted); cursor: pointer; 
-      display: flex; align-items: center; justify-content: center; transition: 0.3s; position: relative;
+    .sidebar-brand { height: 80px; display: flex; align-items: center; padding: 0 20px; gap: 15px; border-bottom: 1px solid rgba(255,255,255,0.05); position: relative; }
+    .brand-orb { min-width: 40px; height: 40px; background: #d35400; color: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(211, 84, 0, 0.4); }
+    .brand-text h1 { margin: 0; font-size: 1rem; color: #fff; white-space: nowrap; }
+    .brand-text p { margin: 0; font-size: 0.5rem; font-weight: 900; letter-spacing: 1px; color: #666; }
+
+    .toggle-btn-pro { position: absolute; right: -12px; top: 25px; width: 26px; height: 26px; border-radius: 50%; background: #d35400; color: white; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 10; box-shadow: 0 0 10px rgba(211, 84, 0, 0.4); transition: 0.3s; }
+    
+    .sidebar-nav { flex: 1; padding: 20px 10px; display: flex; flex-direction: column; gap: 5px; overflow-y: auto; overflow-x: hidden; }
+    .nav-item { display: flex; align-items: center; gap: 15px; padding: 12px 15px; color: #888; text-decoration: none; border-radius: 12px; font-weight: 600; transition: 0.2s; white-space: nowrap; }
+    .nav-item:hover, .nav-item.active-nav { background: rgba(211, 84, 0, 0.1); color: #fff; }
+    .nav-item.active-nav mat-icon { color: #d35400; }
+
+    .sidebar-utilities { padding: 10px; border-top: 1px solid rgba(255,255,255,0.05); }
+    .live-team-trigger { 
+      display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(34, 197, 94, 0.05); 
+      border-radius: 15px; border: 1px solid rgba(34, 197, 94, 0.1); cursor: pointer; transition: 0.3s; position: relative;
     }
-    .util-orb:hover, .util-orb.active { background: var(--primary-color); color: white; border-color: var(--primary-color); box-shadow: 0 0 15px rgba(211, 84, 0, 0.3); }
-    .online-count { position: absolute; top: -5px; right: -5px; background: #22c55e; color: white; font-size: 0.6rem; padding: 2px 6px; border-radius: 10px; font-weight: 900; border: 2px solid var(--surface); }
+    .live-team-trigger:hover, .live-team-trigger.active { background: rgba(34, 197, 94, 0.15); border-color: #22c55e; }
+    
+    .live-indicator-wrapper { position: relative; display: flex; align-items: center; justify-content: center; color: #22c55e; }
+    .online-dot-pulse { 
+      position: absolute; top: -2px; right: -2px; width: 8px; height: 8px; background: #22c55e; 
+      border-radius: 50%; box-shadow: 0 0 10px #22c55e; animation: pulse-green 2s infinite; 
+    }
+    @keyframes pulse-green { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); } }
 
-    .sidebar-footer { padding: 15px; border-top: 1px solid var(--glass-border); display: flex; flex-direction: column; gap: 10px; }
-    .theme-mini-btn { background: var(--bg-app); border: 1px solid var(--glass-border); color: var(--text-muted); border-radius: 10px; padding: 8px; cursor: pointer; display: flex; align-items: center; gap: 10px; font-size: 0.75rem; font-weight: 800; }
-    .user-mini-card { display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(0,0,0,0.03); border-radius: 15px; border: 1px solid var(--glass-border); }
-    .mini-avatar-circular { width: 36px; height: 36px; border-radius: 50% !important; background: var(--secondary-color); color: white; display: flex; align-items: center; justify-content: center; font-weight: 900; background-size: cover; background-position: center; }
-    .mini-avatar-circular.with-img { color: transparent; }
+    .live-team-label { display: flex; flex-direction: column; line-height: 1.2; }
+    .live-team-label span { color: var(--text-main); font-size: 0.8rem; font-weight: 700; }
+    .live-team-label small { color: #2ecc71; font-size: 0.65rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; text-shadow: 0 0 10px rgba(46, 204, 113, 0.2); }
+
+    .unread-badge { 
+      position: absolute; top: -8px; right: -8px; background: #ff4757; color: white; 
+      font-size: 0.7rem; font-weight: 900; padding: 2px 7px; border-radius: 10px; border: 2px solid var(--surface);
+      animation: badgePop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      box-shadow: 0 4px 10px rgba(255, 71, 87, 0.4);
+    }
+    @keyframes badgePop { from { transform: scale(0); } to { transform: scale(1); } }
+
+    .sidebar-footer { padding: 15px; border-top: 1px solid rgba(255,255,255,0.05); }
+    .user-mini-card { display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 15px; overflow: hidden; }
+    .mini-avatar-circular { min-width: 36px; height: 36px; border-radius: 50%; background: #333; background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; color: white; font-weight: 900; }
     .mini-info { flex: 1; overflow: hidden; }
-    .mini-info strong { display: block; font-size: 0.7rem; color: var(--text-main); white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
-    .logout-icon-btn { background: transparent; border: none; color: #ff4757; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
-    .logout-icon-btn:hover { transform: scale(1.2); filter: drop-shadow(0 0 5px #ff4757); }
+    .mini-info strong { display: block; font-size: 0.75rem; color: #fff; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+    .mini-info small { font-size: 0.65rem; color: #666; text-transform: uppercase; }
 
-    .main-content-wrapper { flex: 1; display: flex; flex-direction: column; position: relative; overflow: hidden; }
-    .admin-main { flex: 1; overflow: hidden; }
+    .logout-icon-btn-final { margin-top: 10px; width: 100%; padding: 10px; background: rgba(255, 71, 87, 0.1); color: #ff4757; border: 1px solid rgba(255, 71, 87, 0.2); border-radius: 10px; cursor: pointer; font-size: 0.7rem; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.3s; }
+    .logout-icon-btn-final:hover { background: #ff4757; color: white; }
 
-    /* SOCIAL DRAWER */
-    .social-hub-drawer { position: absolute; top: 0; right: -400px; width: 380px; height: 100vh; background: var(--surface); border-left: 1px solid var(--glass-border); transition: 0.4s; z-index: 1500; display: flex; flex-direction: column; box-shadow: -10px 0 30px rgba(0,0,0,0.1); overflow: hidden; }
-    .social-hub-drawer.open { right: 0; }
+    .theme-toggle-orb { 
+      background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); 
+      color: #888; width: 36px; height: 36px; border-radius: 10px; cursor: pointer; 
+      display: flex; align-items: center; justify-content: center; transition: 0.3s;
+      margin-left: 10px;
+    }
+    .theme-toggle-orb:hover { background: rgba(211, 84, 0, 0.2); color: #d35400; border-color: #d35400; transform: rotate(30deg); }
+    .theme-toggle-orb mat-icon { font-size: 18px; width: 18px; height: 18px; }
+
+    .social-hub-drawer { position: absolute; top: 15px; right: -420px; width: 380px; height: calc(100vh - 30px); background: #111114; border: 1px solid rgba(255,255,255,0.08); border-radius: 25px; transition: 0.5s cubic-bezier(0.19, 1, 0.22, 1); z-index: 6000; display: flex; flex-direction: column; box-shadow: -20px 0 60px rgba(0,0,0,0.6); }
+    .social-hub-drawer.open { right: 20px; }
+
+    .tabs-navigator-pro { display: flex; padding: 10px 20px; background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.05); gap: 10px; }
+    .tabs-navigator-pro button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; background: none; border: none; border-radius: 12px; color: #666; font-size: 0.7rem; font-weight: 800; cursor: pointer; transition: 0.3s; }
+    .tabs-navigator-pro button.active { background: rgba(211, 84, 0, 0.1); color: #d35400; }
+    .tabs-navigator-pro button mat-icon { font-size: 18px; width: 18px; height: 18px; }
+
+    .drawer-header-premium { padding: 25px; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: space-between; }
+    .header-left { display: flex; align-items: center; gap: 15px; color: #fff; }
+    .header-left mat-icon { color: #d35400; font-size: 28px; width: 28px; height: 28px; }
+    .header-left h3 span { color: #d35400; }
+
+    .close-btn-danger-pro { background: #e74c3c !important; color: white !important; border: none; width: 32px; height: 32px; border-radius: 10px; cursor: pointer; transition: 0.3s; display: flex; align-items: center; justify-content: center; }
+    .close-btn-danger-pro:hover { transform: rotate(90deg); box-shadow: 0 0 20px #e74c3c; }
+
+    .drawer-main-content { flex: 1; overflow: hidden; display: flex; flex-direction: column; position: relative; }
+    .scroll-area-premium { flex: 1; overflow-y: auto; padding: 20px; }
+    .user-card-premium { display: flex; align-items: center; gap: 15px; padding: 15px; background: #1a1a1e; margin-bottom: 12px; border-radius: 18px; transition: 0.3s; border: 1px solid transparent; }
+    .user-card-premium:hover { border-color: #d35400; transform: translateX(-5px); }
+    .messenger-item { cursor: pointer; }
+    .chevron-icon { color: #333; transition: 0.3s; }
+    .messenger-item:hover .chevron-icon { color: #d35400; transform: translateX(3px); }
     
-    .drawer-header, .chat-navbar-pro { flex-shrink: 0; padding: 20px 25px; border-bottom: 1px solid var(--glass-border); display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: space-between !important; min-height: 80px; }
-    .back-btn-pro { background: rgba(0,0,0,0.05); color: var(--text-muted); border: 1px solid var(--glass-border); width: 34px; height: 34px; border-radius: 50%; cursor: pointer; transition: 0.3s; display: flex; align-items: center; justify-content: center; }
-    .back-btn-pro:hover { color: var(--primary-color); border-color: var(--primary-color); transform: translateX(-3px); }
-    .avatar-mini-pro { width: 34px; height: 34px; border-radius: 50% !important; background: #333; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 0.75rem; border: 1px solid rgba(255,255,255,0.1); background-size: cover; background-position: center; }
-    .avatar-mini-pro.with-img { color: transparent; }
-    .status-info strong { font-size: 0.85rem; color: var(--text-main); display: block; line-height: 1; }
-    .status-info small { font-size: 0.55rem; color: #22c55e; font-weight: 950; text-transform: uppercase; letter-spacing: 1px; display: flex; align-items: center; gap: 4px; margin-top: 4px; }
-    .status-info small::before { content: ''; width: 5px; height: 5px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 5px #22c55e; }
-    .close-btn-danger { background: rgba(255, 71, 87, 0.1) !important; color: #ff4757 !important; border: 1px solid rgba(255, 71, 87, 0.3) !important; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
-    .close-btn-danger:hover { background: #ff4757; color: white; transform: rotate(90deg); box-shadow: 0 0 15px #ff4757; }
+    .avatar-ring-pro { position: relative; width: 44px; height: 44px; padding: 2px; border: 2px solid #d35400; border-radius: 50%; }
+    .avatar-main { width: 100%; height: 100%; border-radius: 50%; background: #333; background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; color: white; font-weight: 900; }
+    .pulse-status { position: absolute; bottom: 0; right: 0; width: 12px; height: 12px; background: #22c55e; border-radius: 50%; border: 2px solid #111114; }
 
-    .drawer-main-content, .conversation-view { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-    .scroll-area-pro, .chat-messages-box { flex: 1; overflow-y: auto; padding: 25px; width: 100%; box-sizing: border-box; }
-    .drawer-tabs-pro { display: flex; gap: 10px; padding: 20px; flex-shrink: 0; }
-    .drawer-tabs-pro button { flex: 1; border: none; background: rgba(0,0,0,0.05); color: var(--text-muted); padding: 12px; border-radius: 12px; font-size: 0.65rem; font-weight: 950; cursor: pointer; transition: 0.3s; letter-spacing: 1px; }
-    .drawer-tabs-pro button.active { background: var(--primary-color); color: white; box-shadow: 0 5px 15px rgba(211, 84, 0, 0.3); }
-
-    .user-card-social { display: flex; align-items: center; gap: 15px; padding: 15px; border-radius: 20px; background: var(--bg-app); margin-bottom: 12px; transition: 0.3s; border: 1px solid transparent; justify-content: space-between !important; }
-    .avatar-circle { width: 40px; height: 40px; border-radius: 50%; background: #333; display: flex; align-items: center; justify-content: center; font-weight: 900; position: relative; background-size: cover; background-position: center; border: 2px solid rgba(255,255,255,0.1); }
-    .avatar-circle.with-img { color: transparent; }
-    .status-dot { position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; background: #22c55e; border-radius: 50%; border: 2px solid var(--bg-app); }
+    .user-info-pro { flex: 1; min-width: 0; }
+    .user-name-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .user-name-row strong { color: #fff; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     
-    .activity-tag { display: flex; align-items: center; gap: 5px; margin-top: 4px; overflow: hidden; }
-    .activity-tag mat-icon { font-size: 13px; width: 13px; height: 13px; color: var(--primary-color); flex-shrink: 0; }
-    .marquee-container { flex: 1; overflow: hidden; white-space: nowrap; }
-    .marquee-text-pro { display: inline-block; padding-left: 100%; font-size: 0.65rem; color: var(--primary-color); font-weight: 800; animation: marquee-social 12s linear infinite; }
-    @keyframes marquee-social { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+    .unread-dot-mini { width: 10px; height: 10px; background: #ff4757; border-radius: 50%; box-shadow: 0 0 10px #ff4757; animation: badgePop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); flex-shrink: 0; }
+    
+    .activity-text { color: #d35400; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; display: block; }
+    .last-msg-preview { color: #888; font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; margin-top: 2px; }
 
-    .chat-btn-mini-pro { flex-shrink: 0; width: 38px; height: 38px; border-radius: 12px; background: #1a1a1a !important; color: var(--primary-color) !important; border: 1px solid rgba(211, 84, 0, 0.3); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
-    .chat-btn-mini-pro:hover { background: var(--primary-color) !important; color: white !important; transform: scale(1.1); }
+    .chat-trigger-btn { margin-left: 5px; background: none; border: none; color: #444; cursor: pointer; transition: 0.3s; flex-shrink: 0; }
+    .chat-trigger-btn:hover { color: #d35400; }
 
-    .msg-bubble-pro { max-width: 85%; padding: 12px 18px; border-radius: 18px; background: var(--bg-app); border: 1px solid var(--glass-border); width: fit-content !important; }
-    .me .msg-bubble-pro { background: var(--primary-color); color: white; border-color: var(--primary-color); border-bottom-right-radius: 4px; }
-    .msg-bubble-pro p { margin: 0; font-size: 0.9rem; line-height: 1.4; }
-    .msg-bubble-pro small { font-size: 0.6rem; opacity: 0.7; display: block; margin-top: 6px; text-align: right; }
+    .chat-container-premium { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #0a0a0c; display: flex; flex-direction: column; z-index: 10; border-radius: 25px; }
+    .chat-active-header { padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #fff; display: flex; align-items: center; gap: 15px; }
+    .back-btn-pro { background: none; border: none; color: #666; cursor: pointer; }
+    .header-user-info { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 0.9rem; }
+    .avatar-mini-pro { width: 30px; height: 30px; border-radius: 50%; background: #333; background-size: cover; background-position: center; }
+    .messages-list { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+    .msg-row { display: flex; width: 100%; }
+    .msg-row.me { justify-content: flex-end; }
+    .bubble-premium { max-width: 80%; padding: 12px 16px; border-radius: 18px; background: #1a1a1e; color: #ccc; border: 1px solid rgba(255,255,255,0.05); position: relative; }
+    .bubble-premium p { margin: 0; font-size: 0.85rem; line-height: 1.4; }
+    .bubble-premium small { font-size: 0.6rem; color: #555; display: block; margin-top: 5px; text-align: right; }
+    .me .bubble-premium { background: #d35400; color: white; border: none; }
+    .chat-footer-premium { padding: 20px; display: flex; gap: 10px; background: #111114; }
+    .chat-footer-premium input { flex: 1; background: #1a1a1e; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px 18px; color: white; outline: none; }
+    .send-btn-pro { width: 45px; height: 45px; background: #d35400; color: white; border: none; border-radius: 12px; cursor: pointer; }
 
-    .drawer-footer { flex-shrink: 0; padding: 20px 25px; border-top: 1px solid var(--glass-border); background: var(--surface); }
-    .quick-chat-preview { display: flex; background: var(--bg-app); border-radius: 50px; padding: 5px 5px 5px 15px; border: 1px solid var(--glass-border); }
-    .quick-chat-preview input { border: none; background: transparent; outline: none; color: var(--text-main); font-size: 0.85rem; flex: 1; }
-    .quick-chat-preview button { background: var(--primary-color); color: white; border: none; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.3s; }
-    .animate-slide-in { animation: slideIn 0.3s ease-out; }
-    @keyframes slideIn { from { transform: translateX(50px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    .main-content-wrapper { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+    .admin-main { flex: 1; height: 100%; overflow: hidden; position: relative; }
   `]
 })
 export class AdminShellComponent implements OnInit, OnDestroy {
   @ViewChild('chatScroll') private chatScrollContainer?: ElementRef;
-  userName = 'Usuario'; userRole = ''; myEmail = ''; myAvatar = ''; isDarkMode = false; isCollapsed = false; showSocialHub = false; activeTab: 'users' | 'chat' = 'users'; 
-  onlineUsers: any[] = []; messages: ChatMessage[] = []; chatMessage = ''; unreadMessages = 0; currentPolicyName = ''; currentPolicyId: string | null = null; selectedUser: any | null = null; 
+  userName = '...'; userRole = ''; myEmail = ''; myAvatar = ''; isDarkMode = false; isCollapsed = false; showSocialHub = false; activeTab: 'users' | 'chat' = 'users';
+  onlineUsers: any[] = []; messages: any[] = []; chatMessage = ''; unreadMessages = 0; currentPolicyName = ''; currentPolicyId: string | null = null; selectedUser: any | null = null;
+  
+  // CACHÉ DE PERFILES (Para no enviar fotos por WS)
+  private allExecutives: any[] = [];
+  
   private subs = new Subscription();
 
-  constructor(private authService: AuthService, private router: Router, private collabService: CollaborationService, private aiService: AiAssistantService, private cdr: ChangeDetectorRef, private dialog: MatDialog) {}
+  constructor(
+    private authService: AuthService, 
+    private router: Router, 
+    private collabService: CollaborationService, 
+    private aiService: AiAssistantService, 
+    private cdr: ChangeDetectorRef, 
+    private dialog: MatDialog,
+    private bpmsService: BpmsService
+  ) {}
+
+  unreadSenders = new Set<string>();
+  lastMessagesMap = new Map<string, any>();
+  private notificationSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3');
 
   ngOnInit() {
-    this.authService.user$.subscribe(user => {
-      if (user) {
-        this.userName = `${user.nombre} ${user.apellido}`;
-        this.userRole = user.rol;
-        this.myEmail = user.email;
-        this.myAvatar = user.avatar;
+    this.notificationSound.load();
+    // Cargar base de datos de ejecutivos para tener sus fotos
+    this.bpmsService.listarEjecutivos().subscribe((data: any[]) => {
+        this.allExecutives = data;
         this.cdr.detectChanges();
-      }
     });
 
-    this.collabService.conectarGlobal();
+    this.authService.user$.subscribe(user => { 
+      if (user) { 
+        this.userName = this.authService.getNombreCompleto(); 
+        this.userRole = user.rol; 
+        this.myEmail = user.email; 
+        this.myAvatar = user.avatar; 
+        this.collabService.enviarActividadGlobal('En línea', 'sensors', 'active', null);
+        this.cdr.detectChanges(); 
+      } 
+    });
     
-    // Anuncio inicial inmediato
-    this.actualizarActividad();
+    this.collabService.conectarGlobal();
+    this.subs.add(this.collabService.globalPresence$.subscribe((users: any[]) => { 
+      this.onlineUsers = [...users]; 
+      this.cdr.detectChanges(); 
+    }));
 
-    this.subs.add(this.collabService.globalPresence$.subscribe(users => { this.onlineUsers = users; this.cdr.detectChanges(); }));
-    this.subs.add(this.collabService.chatMessages$.subscribe(msgs => {
-      this.messages = msgs;
-      if (!this.showSocialHub || !this.selectedUser) this.unreadMessages++;
-      this.scrollToBottom();
-      this.cdr.detectChanges();
+    this.subs.add(this.collabService.chatMessages$.subscribe((msgs: any[]) => { 
+        this.messages = msgs; 
+        
+        const lastMsg = msgs[msgs.length - 1];
+        if (lastMsg) {
+            // Actualizar mapa de últimos mensajes (estilo Messenger)
+            const otherId = lastMsg.fromId === this.myEmail ? lastMsg.toId : lastMsg.fromId;
+            if (otherId) this.lastMessagesMap.set(otherId, lastMsg);
+
+            // LÓGICA DE NOTIFICACIONES Y FEEDBACK SENSORIAL
+            if (lastMsg.fromId !== this.myEmail) {
+                if (!this.showSocialHub || (this.selectedUser && this.selectedUser.userId !== lastMsg.fromId)) {
+                    this.unreadSenders.add(lastMsg.fromId);
+                    this.unreadMessages = this.unreadSenders.size;
+                    
+                    // Feedback: Sonido y Vibración
+                    this.playNotification();
+                }
+            }
+        }
+
+        this.scrollToBottom(); 
+        this.cdr.detectChanges(); 
     }));
-    this.subs.add(this.aiService.currentContext$.subscribe(ctx => {
-      this.currentPolicyName = (ctx.name && ctx.name !== 'General') ? ctx.name : '';
-      this.currentPolicyId = ctx.id || null;
-      // Emitir inmediatamente al cambiar de contexto (isla)
-      this.actualizarActividad();
-    }));
+    this.subs.add(this.aiService.currentContext$.subscribe(ctx => { this.currentPolicyName = (ctx.name && ctx.name !== 'General') ? ctx.name : ''; this.currentPolicyId = ctx.id || null; this.actualizarActividad(); }));
     this.subs.add(this.router.events.pipe(filter(e => e instanceof NavigationEnd)).subscribe(() => this.actualizarActividad()));
   }
 
-  get activeConversations() {
-    const convs = new Map<string, any>();
-    this.messages.forEach(m => {
-      const otherId = m.fromId === this.myEmail ? m.toId : m.fromId;
-      if (!otherId) return;
-      const otherUser = this.onlineUsers.find(u => u.userId === otherId) || { userId: otherId, userName: m.fromId === this.myEmail ? 'Usuario' : m.from, color: m.color, avatar: '' };
-      convs.set(otherId, { user: otherUser, lastMessage: m, unread: false });
+  private playNotification() {
+    try {
+        this.notificationSound.play().catch(() => {});
+        if ('vibrate' in navigator) navigator.vibrate(50);
+    } catch (e) {}
+  }
+
+  get filteredUsers() { 
+    if (!this.onlineUsers || !this.myEmail) return [];
+    const userMap = new Map<string, any>();
+    
+    this.onlineUsers.forEach(u => { 
+        if (u.userId === this.myEmail) return; 
+        
+        const dbUser = this.allExecutives.find(exec => exec.email === u.userId);
+        if (dbUser && dbUser.avatar) u.avatar = dbUser.avatar;
+
+        if (!userMap.has(u.userId) || (u.timestamp || 0) > (userMap.get(u.userId).timestamp || 0)) {
+            userMap.set(u.userId, u); 
+        }
     });
-    return Array.from(convs.values()).sort((a, b) => b.lastMessage.timestamp - a.lastMessage.timestamp);
+    
+    // ORDENAR: Primero los que tienen mensajes sin leer, luego por timestamp
+    return Array.from(userMap.values()).sort((a, b) => {
+        const aUnread = this.unreadSenders.has(a.userId) ? 1 : 0;
+        const bUnread = this.unreadSenders.has(b.userId) ? 1 : 0;
+        if (aUnread !== bUnread) return bUnread - aUnread;
+        return (b.timestamp || 0) - (a.timestamp || 0);
+    });
+  }
+
+  getLastMessagePreview(userId: string): string {
+    const msg = this.lastMessagesMap.get(userId);
+    if (!msg) return '';
+    const prefix = msg.fromId === this.myEmail ? 'Tú: ' : '';
+    const text = msg.content.length > 30 ? msg.content.substring(0, 27) + '...' : msg.content;
+    return prefix + text;
+  }
+
+  abrirConversacion(user: any) { 
+    this.selectedUser = user; 
+    this.unreadSenders.delete(user.userId);
+    this.unreadMessages = this.unreadSenders.size;
+    this.scrollToBottom(); 
+  }
+
+  abrirConversacionDesdeActivos(user: any) {
+    this.activeTab = 'chat';
+    this.abrirConversacion(user);
   }
 
   get filteredMessages() {
     if (!this.selectedUser) return [];
-    return this.messages.filter(m => (m.fromId === this.selectedUser.userId && m.toId === this.myEmail) || (m.fromId === this.myEmail && m.toId === this.selectedUser.userId));
+    return this.messages.filter(m => 
+      (m.fromId === this.selectedUser.userId && m.toId === this.myEmail) || 
+      (m.fromId === this.myEmail && m.toId === this.selectedUser.userId)
+    );
   }
 
-  get filteredUsers() { 
-    const uniqueUsers = new Map<string, any>();
-    
-    // Ordenar por timestamp descendente para tener la actividad más reciente
-    const sorted = [...this.onlineUsers].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-    
-    for (const u of sorted) {
-      const isOtherSession = u.sessionId !== (this.collabService as any).sessionId;
-      
-      // ELIMINADO EL FILTRO DE POLÍTICA AQUÍ: El chat debe ser global.
-      if (isOtherSession && !uniqueUsers.has(u.userId)) {
-        uniqueUsers.set(u.userId, u);
-      }
+  enviarMensaje() { if (!this.chatMessage.trim() || !this.selectedUser) return; this.collabService.enviarMensajePrivado(this.selectedUser.userId, this.chatMessage); this.chatMessage = ''; this.scrollToBottom(); }
+  actualizarActividad() { const url = this.router.url; let activity = 'Navegando'; if (url.includes('designer')) activity = this.currentPolicyName ? `Editando: ${this.currentPolicyName}` : 'En el Diseñador'; else if (url.includes('departments')) activity = 'Departamentos'; else if (url.includes('executives')) activity = 'Casting Humano'; this.collabService.enviarActividadGlobal(activity, 'sensors', 'active', this.currentPolicyId); }
+  toggleTheme() { 
+    this.isDarkMode = !this.isDarkMode; 
+    if (this.isDarkMode) {
+      document.body.classList.add('dark-mode');
+      document.body.classList.remove('light-mode');
+    } else {
+      document.body.classList.add('light-mode');
+      document.body.classList.remove('dark-mode');
     }
-    
-    return Array.from(uniqueUsers.values());
+    this.cdr.detectChanges();
   }
-  abrirConversacion(user: any) { this.selectedUser = user; this.unreadMessages = 0; this.scrollToBottom(); }
-  enviarMensaje() {
-    if (!this.chatMessage.trim() || !this.selectedUser) return;
-    this.collabService.enviarMensajePrivado(this.selectedUser.userId, this.chatMessage);
-    this.chatMessage = '';
-    this.scrollToBottom();
-  }
-
-  actualizarActividad() {
-    const url = this.router.url;
-    let activity = 'Navegando'; let icon = 'sensors';
-    if (url.includes('designer')) activity = this.currentPolicyName ? `Diseñando: ${this.currentPolicyName}` : 'En el Diseñador';
-    else if (url.includes('departments')) activity = 'Gestionando Deptos';
-    else if (url.includes('executives')) activity = 'Casting Humano';
-    else if (url.includes('monitor')) activity = 'Monitor Global';
-    
-    // ENVIAR ACTIVIDAD CON ID DE POLÍTICA (SALA)
-    this.collabService.enviarActividadGlobal(activity, icon, 'active', this.currentPolicyId);
-  }
-
-  toggleTheme() { this.isDarkMode = !this.isDarkMode; if (this.isDarkMode) document.body.classList.add('dark-mode'); else document.body.classList.remove('dark-mode'); }
-  
-  logout() { 
-    this.dialog.closeAll(); // Cierra todos los diálogos abiertos antes de salir
-    this.collabService.limpiarHistorialSesion(); 
-    this.collabService.desconectarGlobal(); 
-    this.authService.logout(); 
-    this.router.navigate(['/login']); 
-  }
-
-  private scrollToBottom(): void {
-    setTimeout(() => { if (this.chatScrollContainer) this.chatScrollContainer.nativeElement.scrollTop = this.chatScrollContainer.nativeElement.scrollHeight; }, 100);
-  }
-
+  logout() { this.dialog.closeAll(); this.collabService.desconectarGlobal(); this.authService.logout(); this.router.navigate(['/login']); }
+  private scrollToBottom(): void { setTimeout(() => { if (this.chatScrollContainer) this.chatScrollContainer.nativeElement.scrollTop = this.chatScrollContainer.nativeElement.scrollHeight; }, 100); }
   ngOnDestroy() { this.subs.unsubscribe(); this.collabService.desconectarGlobal(); }
 }

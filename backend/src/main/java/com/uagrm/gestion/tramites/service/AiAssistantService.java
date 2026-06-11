@@ -26,6 +26,35 @@ public class AiAssistantService {
     private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
     private static final String MODEL = "llama-3.3-70b-versatile";
 
+    /**
+     * MÉTODO SIMPLIFICADO para consultas directas (Uso interno del sistema)
+     */
+    public String consultarIA(String systemPrompt, String userPrompt) {
+        try {
+            Map<String, Object> body = new HashMap<>();
+            body.put("model", MODEL);
+            body.put("temperature", 0.5); // Más bajo para mayor precisión en filtros/datos
+            
+            List<Map<String, String>> messages = new ArrayList<>();
+            messages.add(Map.of("role", "system", "content", systemPrompt));
+            messages.add(Map.of("role", "user", "content", userPrompt));
+            body.put("messages", messages);
+
+            String res = restClient.post()
+                .uri(GROQ_URL)
+                .header("Authorization", "Bearer " + apiKey)
+                .header("Content-Type", "application/json")
+                .body(body)
+                .retrieve()
+                .body(String.class);
+
+            return objectMapper.readTree(res).path("choices").get(0).path("message").path("content").asText().trim();
+        } catch (Exception e) {
+            log.error("Error en consulta simplificada IA: {}", e.getMessage());
+            return "{}";
+        }
+    }
+
     public String consultarIA(String pregunta, String modo, String contexto, String manual, String estilo) {
         String finalPregunta = (pregunta != null) ? pregunta : "";
         String finalContexto = (contexto != null) ? contexto : "General";
@@ -57,30 +86,28 @@ public class AiAssistantService {
                 """, styleInstruction, finalContexto, finalManual);
         }
 
-        try {
-            // Usamos un Map mutable para evitar problemas con valores nulos
-            Map<String, Object> body = new HashMap<>();
-            body.put("model", MODEL);
-            body.put("temperature", 0.7);
-            
-            List<Map<String, String>> messages = new ArrayList<>();
-            messages.add(Map.of("role", "system", "content", systemPrompt));
-            messages.add(Map.of("role", "user", "content", finalPregunta));
-            
-            body.put("messages", messages);
+        return this.consultarIA(systemPrompt, finalPregunta);
+    }
 
-            String res = restClient.post()
-                .uri(GROQ_URL)
-                .header("Authorization", "Bearer " + apiKey)
-                .header("Content-Type", "application/json")
-                .body(body)
-                .retrieve()
-                .body(String.class);
+    public String generarBorradorDocumento(String prompt, Map<String, Object> contexto) {
+        String systemPrompt = """
+            Eres un Redactor Jurídico y Administrativo experto. 
+            Tu tarea es generar el CONTENIDO HTML de un documento oficial basado en los datos de un formulario y las instrucciones del funcionario.
+            
+            REGLAS:
+            1. Devuelve SOLO el código HTML (etiquetas h2, p, strong, table, etc.). Sin preámbulos.
+            2. Usa los datos del CONTEXTO JSON proporcionado para rellenar el documento.
+            3. SI UN DATO NO ESTÁ EN EL CONTEXTO, deja un marcador entre corchetes como [NOMBRE_CAMPO] para que sea llenado después.
+            4. El estilo debe ser formal, sobrio y elegante.
+            """;
 
-            return objectMapper.readTree(res).path("choices").get(0).path("message").path("content").asText().trim();
-        } catch (Exception e) {
-            log.error("Error en consulta de asistente IA: {}", e.getMessage());
-            return "Lo siento, tuve un problema al procesar tu consulta con la IA. Verificando mi conexion...";
-        }
+        String userMessage = String.format("""
+            INSTRUCCIÓN DEL FUNCIONARIO: %s
+            
+            CONTEXTO DEL FORMULARIO (DATOS DISPONIBLES):
+            %s
+            """, prompt, contexto.toString());
+
+        return this.consultarIA(systemPrompt, userMessage);
     }
 }

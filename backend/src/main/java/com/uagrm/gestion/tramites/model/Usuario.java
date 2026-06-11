@@ -16,6 +16,8 @@ public class Usuario {
     private String username;
     private String email;
     private String passwordHash;
+    private String ci; // CAMPO CRÃTICO PARA VINCULACIÃ“N
+    private String celular; // NUEVO CAMPO
     private String rol;
     private String avatar;
     
@@ -39,6 +41,10 @@ public class Usuario {
     public void setEmail(String email) { this.email = email; }
     public String getPasswordHash() { return passwordHash; }
     public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
+    public String getCi() { return ci; }
+    public void setCi(String ci) { this.ci = ci; }
+    public String getCelular() { return celular; }
+    public void setCelular(String celular) { this.celular = celular; }
     public String getRol() { return rol; }
     public void setRol(String rol) { this.rol = rol; }
     public String getAvatar() { return avatar; }

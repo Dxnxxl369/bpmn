@@ -42,7 +42,7 @@ export class AnaliticasDashboardComponent implements OnInit {
   reporteIA: string = '';
   cargandoIA: boolean = false;
 
-  private apiUrl = 'http://13.217.197.171:8080/api/analiticas';
+  private apiUrl = 'http://localhost:8080/api/analiticas';
 
   constructor(private http: HttpClient) {
     this.initCharts();

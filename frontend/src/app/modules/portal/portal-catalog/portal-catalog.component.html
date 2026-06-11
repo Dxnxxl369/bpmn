@@ -7,15 +7,38 @@
         Trámites digitalizados y orquestados por IA para tu comodidad.
       </p>
       
-      <div class="search-box glass-panel">
+      <div class="search-box glass-panel" [class.triage-active]="isListening">
         <mat-icon>search</mat-icon>
-        <input type="text" placeholder="¿Qué trámite buscas? (Ej: Medidor, Reclamo...)" [(ngModel)]="busqueda" (input)="filtrar()">
+        <input type="text" 
+               placeholder="¿Qué trámite buscas? Puedes hablar o escribir..." 
+               [(ngModel)]="busqueda" 
+               (input)="filtrar()"
+               (keyup.enter)="ejecutarTriageIA(busqueda)">
+        
+        <button type="button" class="mic-btn-portal" [class.listening]="isListening" (click)="toggleMic()">
+          <mat-icon>{{ isListening ? 'graphic_eq' : 'mic' }}</mat-icon>
+        </button>
+      </div>
+
+      <!-- RECOMENDACIÓN IA -->
+      <div class="triage-searching animate-fade-in" *ngIf="procesandoTriage">
+          <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+          <p>✨ IA está analizando el mejor trámite para tu necesidad...</p>
+      </div>
+
+      <div class="ia-recommendation animate-fade-in" *ngIf="recomendacionIA && recomendacionIA.politicaId && !procesandoTriage">
+          <mat-icon>auto_awesome</mat-icon>
+          <div class="rec-text">
+            <strong>IA te recomienda:</strong> {{ recomendacionIA.razon }}
+          </div>
       </div>
     </header>
 
     <!-- GRILLA DE SERVICIOS (SOLO PUBLICADOS) -->
     <div class="services-grid">
-      <mat-card *ngFor="let s of serviciosFiltrados" class="service-card-modern glass-panel animate-fade-in">
+      <mat-card *ngFor="let s of serviciosFiltrados" 
+                class="service-card-modern glass-panel animate-fade-in"
+                [class.ai-highlighted]="recomendacionIA?.politicaId === s.id">
         <div class="card-icon-orb"><mat-icon>assignment</mat-icon></div>
         <h3 class="card-title">{{ s.nombre }}</h3>
         <p class="card-desc">{{ s.descripcion || 'Trámite digitalizado disponible para inicio inmediato.' }}</p>
@@ -32,36 +55,89 @@
        <p>No hay servicios disponibles en este momento.</p>
     </div>
 
-    <!-- MODAL DE INICIO INTELIGENTE -->
+    <!-- MODAL DE INICIO INTELIGENTE (SOLO FORMULARIO) -->
     <ng-template #dialogInicio>
-      <div class="dialog-modern-portal" [class.dark-dialog]="isDarkMode">
-        <header class="dialog-head">
-          <div class="head-top">
-            <span class="step-badge">PASO 1 DE 1</span>
-            <button mat-icon-button mat-dialog-close><mat-icon>close</mat-icon></button>
-          </div>
-          <h2>Solicitud de <span>{{ servicioSeleccionado?.nombre }}</span></h2>
-          <p>Completa el formulario oficial para procesar tu solicitud.</p>
+      <div class="dialog-simple-start" [class.dark-dialog]="isDarkMode">
+        <header class="dialog-head-simple">
+          <div class="icon-circle"><mat-icon>{{ identificado ? 'assignment' : 'fingerprint' }}</mat-icon></div>
+          <h2>{{ identificado ? 'Formulario de Solicitud' : 'Identificación Requerida' }}</h2>
+          <p>{{ identificado ? 'Complete los datos para: ' + servicioSeleccionado?.nombre : 'Ingrese su C.I. para comenzar el trámite.' }}</p>
+          <button mat-icon-button mat-dialog-close class="btn-close-top"><mat-icon>close</mat-icon></button>
         </header>
         
-        <div class="dialog-body-scroll scroll-custom">
-          <!-- CARGA DEL FORMULARIO DINÁMICO DISEÑADO PARA CLIENTE -->
-          <app-formulario-dinamico 
-            *ngIf="schemaCliente"
-            [schema]="schemaCliente" 
-            (submitted)="confirmarInicio($event)">
-          </app-formulario-dinamico>
-          
-          <div class="loading-form-ia" *ngIf="!schemaCliente && !errorCarga">
-             <mat-progress-bar mode="indeterminate"></mat-progress-bar>
-             <p>Cargando formulario oficial...</p>
-          </div>
-          
-          <div class="error-msg" *ngIf="errorCarga">
-             <mat-icon>warning</mat-icon>
-             <p>Este trámite no tiene un formulario de cliente configurado.</p>
-          </div>
+        <div class="dialog-body-centered scroll-custom">
+           <!-- PASO 0: IDENTIFICACIÓN -->
+           <div class="id-check-box animate-fade-in" *ngIf="!identificado">
+              <mat-form-field appearance="outline" class="full-width premium-field">
+                 <mat-label>Cédula de Identidad (C.I.)</mat-label>
+                 <input matInput [(ngModel)]="ciCiudadano" placeholder="Ej: 1234567" (keyup.enter)="confirmarIdentidad()">
+                 <mat-icon matSuffix>badge</mat-icon>
+              </mat-form-field>
+              <button class="btn-confirm-id" (click)="confirmarIdentidad()" [disabled]="!ciCiudadano">
+                 CONTINUAR AL FORMULARIO <mat-icon>arrow_forward</mat-icon>
+              </button>
+           </div>
+
+           <!-- PASO 1: FORMULARIO (SÓLO SI ESTÁ IDENTIFICADO) -->
+           <ng-container *ngIf="identificado">
+             <app-formulario-dinamico 
+                *ngIf="schemaCliente && !errorCarga"
+                [schema]="schemaCliente"
+                [taskId]="taskIdActual"
+                [initialData]="respuestasIA"
+                [isAuditMode]="false"
+                [isPortalMode]="true"
+                [instancia]="{ clienteCi: ciCiudadano, politicaNegocioId: servicioSeleccionado?.id, id: instanciaIdExistente }"
+                (submitted)="confirmarInicio($event)"
+                (closed)="dialog.closeAll()">
+             </app-formulario-dinamico>
+             <div class="loading-form-ia" *ngIf="!schemaCliente && !errorCarga">
+                <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+                <p>Cargando formulario oficial...</p>
+             </div>
+             
+             <div class="error-msg" *ngIf="errorCarga">
+                <mat-icon>warning</mat-icon>
+                <p>Este trámite no tiene un formulario de cliente configurado.</p>
+             </div>
+           </ng-container>
         </div>
+      </div>
+    </ng-template>
+
+    <!-- MODAL DE TRÁMITE YA EN CURSO O SUBSANACIÓN (SEGURIDAD E INTELIGENCIA) -->
+    <ng-template #dialogEnCurso>
+      <div class="dialog-status-alert animate-pop-in" [class.dark-dialog]="isDarkMode">
+        <mat-icon class="alert-icon" [style.color]="tieneObservaciones ? '#ef4444' : 'var(--primary-color)'">
+            {{ tieneObservaciones ? 'warning' : 'info' }}
+        </mat-icon>
+        <h2>{{ tieneObservaciones ? 'Acción Requerida' : 'Trámite en Curso' }}</h2>
+        
+        <!-- MODO 1: TRÁMITE EN CURSO NORMAL -->
+        <ng-container *ngIf="!tieneObservaciones">
+            <p>Se ha detectado que ya existe una solicitud activa asociada a este documento de identidad para el servicio seleccionado.</p>
+            <div class="alert-info-box">
+              <mat-icon>security</mat-icon>
+              <span>Por seguridad, no se puede iniciar un nuevo trámite hasta que el actual finalice.</span>
+            </div>
+            <p class="footer-note">Si desea conocer el estado de su solicitud, por favor utilice su <b>Código de Seguimiento</b> en la sección de rastreo.</p>
+            <button class="btn-alert-ok" mat-dialog-close>ENTENDIDO</button>
+        </ng-container>
+
+        <!-- MODO 2: TRÁMITE OBSERVADO (FASE 4.1) -->
+        <ng-container *ngIf="tieneObservaciones">
+            <p style="color: #ef4444; font-weight: bold;">Su trámite ha sido revisado y requiere correcciones para continuar.</p>
+            
+            <div class="obs-list-container" style="text-align: left; margin-bottom: 20px; max-height: 150px; overflow-y: auto;">
+                <div *ngFor="let obs of observacionesDetalle" style="background: rgba(239, 68, 68, 0.05); border-left: 3px solid #ef4444; padding: 10px; margin-bottom: 8px; border-radius: 4px;">
+                    <div style="font-size: 11px; font-weight: 900; color: #ef4444;">{{ obs.tipo }}</div>
+                    <div style="font-size: 13px; color: var(--text-main);">"{{ obs.motivo }}"</div>
+                </div>
+            </div>
+
+            <p class="footer-note" style="margin-bottom: 20px;">Por favor, corrija las observaciones indicadas para reanudar su trámite.</p>
+            <button class="btn-alert-ok" style="background: #ef4444;" (click)="iniciarSubsanacion()">SOLUCIONAR OBSERVACIONES</button>
+        </ng-container>
       </div>
     </ng-template>
 

@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 
+import com.google.firebase.messaging.*;
+
 @Service
 public class PushNotificationService {
 
@@ -30,20 +32,47 @@ public class PushNotificationService {
         }
     }
 
-    public void sendPushNotification(String fcmToken, String title, String body) {
+    public void sendPushNotification(String fcmToken, String title, String body, String colorHex) {
+        if (fcmToken == null || fcmToken.isBlank()) {
+            System.err.println("âŒ [PUSH-DEBUG] Error: Token vacÃ­o. No se puede enviar notificaciÃ³n.");
+            return;
+        }
+
+        System.out.println("ðŸš€ [PUSH-DEBUG] INTENTANDO ENVIAR A TOKEN: " + fcmToken.substring(0, Math.min(fcmToken.length(), 20)) + "...");
+        System.out.println("ðŸ“¬ [PUSH-DEBUG] TÃTULO: " + title + " | CUERPO: " + body);
+
         try {
+            AndroidNotification androidNotification = AndroidNotification.builder()
+                    .setTitle(title)
+                    .setBody(body)
+                    .setColor(colorHex != null ? colorHex : "#007BFF")
+                    .setSound("default")
+                    .setPriority(AndroidNotification.Priority.HIGH)
+                    .build();
+
             Message message = Message.builder()
                     .setToken(fcmToken)
                     .setNotification(Notification.builder()
                             .setTitle(title)
                             .setBody(body)
                             .build())
+                    .setAndroidConfig(AndroidConfig.builder()
+                            .setNotification(androidNotification)
+                            .setPriority(AndroidConfig.Priority.HIGH)
+                            .build())
                     .build();
 
             String response = FirebaseMessaging.getInstance().send(message);
-            System.out.println("Notificación enviada con éxito: " + response);
+            System.out.println("âœ… [PUSH-DEBUG] Ã‰XITO: NotificaciÃ³n enviada. ID: " + response);
         } catch (Exception e) {
-            System.err.println("Error enviating push: " + e.getMessage());
+            System.err.println("âŒ [PUSH-DEBUG] ERROR FIREBASE: " + e.getMessage());
+            e.printStackTrace();
         }
     }
+
+
+    public void sendPushNotification(String fcmToken, String title, String body) {
+        sendPushNotification(fcmToken, title, body, "#007BFF");
+    }
 }
+

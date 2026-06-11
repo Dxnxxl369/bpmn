@@ -166,7 +166,7 @@ export class AiAssistantComponent implements OnInit, OnDestroy {
       estilo: this.selectedStyle
     };
 
-    this.http.post<any>('http://13.217.197.171:8080/api/ia/chat-asistente', body).subscribe({
+    this.http.post<any>('http://localhost:8080/api/ia/chat-asistente', body).subscribe({
       next: (res: any) => {
         this.isTyping = false;
         let rawContent = res.respuesta;

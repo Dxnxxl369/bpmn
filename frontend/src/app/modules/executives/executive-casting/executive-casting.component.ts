@@ -9,7 +9,6 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { BpmsService, Departamento, UsuarioEjecutivo } from '../../../services/bpms.service';
-import { ConfirmDialogComponent } from '../../../components/confirm-dialog/confirm-dialog.component';
 import { FilterByIdPipe } from '../../../pipes/filter-by-id.pipe';
 
 @Component({
@@ -35,6 +34,7 @@ export class ExecutiveCastingComponent implements OnInit {
   ) {}
 
   ngOnInit() {
+    this.bpmsService.registrarAuditoria('ACCESO_MODULO', 'CASTING HUMANO', 'MAIN', 'Entró a gestión de personal').subscribe();
     this.cargarDatos();
   }
 
@@ -51,12 +51,10 @@ export class ExecutiveCastingComponent implements OnInit {
 
   asignar(exec: UsuarioEjecutivo) {
     if(!exec.id) return;
-    
-    // El array de IDs ya viene en exec.departamentoIds gracias al [(ngModel)] múltiple
     const ids = exec.departamentoIds || [];
-
     this.bpmsService.asignarDepartamentos(exec.id, ids).subscribe({
       next: () => {
+        this.bpmsService.registrarAuditoria('ASIGNAR_DEPARTAMENTOS', 'CASTING HUMANO', exec.id, `Actualizó asignaciones de: ${exec.nombre}`).subscribe();
         this.snackBar.open(`✅ Asignación actualizada para ${exec.nombre}`, 'OK', {
           duration: 3000,
           panelClass: ['snack-success-premium'],

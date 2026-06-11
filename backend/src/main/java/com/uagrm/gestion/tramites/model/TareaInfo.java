@@ -41,14 +41,22 @@ public class TareaInfo {
     public void setRamas(List<DecisionBranch> ramas) { this.ramas = ramas; }
 
     public static class DecisionBranch {
+        private String flowId;
         private String condicion;
+        private String destinoId;
         private String destinoNombre;
 
-        public DecisionBranch(String condicion, String destinoNombre) {
+        public DecisionBranch() {}
+
+        public DecisionBranch(String flowId, String condicion, String destinoId, String destinoNombre) {
+            this.flowId = flowId;
             this.condicion = condicion;
+            this.destinoId = destinoId;
             this.destinoNombre = destinoNombre;
         }
+        public String getFlowId() { return flowId; }
         public String getCondicion() { return condicion; }
+        public String getDestinoId() { return destinoId; }
         public String getDestinoNombre() { return destinoNombre; }
     }
 }

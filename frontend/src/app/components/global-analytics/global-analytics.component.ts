@@ -45,8 +45,8 @@ export class GlobalAnalyticsComponent implements OnInit {
   };
 
   rankingGlobal: any[] = [];
+  backlogDeptos: any[] = [];
   isDataLoaded = false;
-  expandedFuncId: string | null = null; // CONTROL DE EXPANSIÓN
 
   constructor(private http: HttpClient) {
     this.initCharts();
@@ -63,7 +63,6 @@ export class GlobalAnalyticsComponent implements OnInit {
       colors: ['#d35400'],
       xaxis: { categories: [], labels: { style: { colors: '#94a3b8' } } }
     };
-
     this.deptoChartOptions = {
       series: [],
       chart: { type: "bar", height: 350, stacked: true, toolbar: { show: false } },
@@ -72,61 +71,46 @@ export class GlobalAnalyticsComponent implements OnInit {
     };
   }
 
-  toggleExpand(nombre: string) {
-    this.expandedFuncId = (this.expandedFuncId === nombre) ? null : nombre;
-  }
-
   cargarDatos() {
-    this.http.get<any>('http://13.217.197.171:8080/api/analiticas/global').subscribe({
+    this.http.get<any>('http://localhost:8080/api/analiticas/global').subscribe({
       next: (res) => {
         this.stats.totalTareas = res.totalTareas;
         this.stats.cuelloCritico = res.cuelloCritico;
         this.stats.mejorFuncionario = res.mejorFuncionario;
         this.rankingGlobal = res.rankingGlobal || [];
         
+        if (res.saturacionActual) {
+          this.backlogDeptos = Object.values(res.saturacionActual);
+        }
+        
         const eG = (res.ejecucionPromedioGlobal / (res.ejecucionPromedioGlobal + res.esperaPromedioGlobal)) * 100;
         this.stats.eficienciaGlobal = Math.round(eG || 0);
 
-        // RESTAURAR TRÁFICO
         this.trafficChartOptions = {
           series: [{ name: "Trámites", data: res.serieTrafico || [] }],
           chart: { height: 320, type: "area", toolbar: { show: false } },
           colors: ['#d35400'],
           stroke: { curve: 'smooth', width: 3 },
-          xaxis: { 
-            categories: Array.from({length: 24}, (_, i) => `${i}:00`),
-            labels: { style: { colors: '#94a3b8' } } 
-          },
+          xaxis: { categories: Array.from({length: 24}, (_, i) => `${i}:00`), labels: { style: { colors: '#94a3b8' } } },
           fill: { type: 'gradient', gradient: { opacityFrom: 0.5, opacityTo: 0.1 } },
           theme: { mode: 'dark' }
         };
 
-        // RESTAURAR DEPARTAMENTOS
         if (res.rendimientoDeptos && Object.keys(res.rendimientoDeptos).length > 0) {
           const deptosRaw = Object.keys(res.rendimientoDeptos);
-          const labels = deptosRaw.map(d => {
-            if (!d || d === 'null') return 'Indefinido';
-            return d === 'GENERAL' ? 'Ventanilla' : d.toUpperCase();
-          });
-          
           this.deptoChartOptions = {
             series: [
-              { name: "Espera (S)", data: deptosRaw.map(d => res.rendimientoDeptos[d] ? Math.round(res.rendimientoDeptos[d].espera || 0) : 0) },
-              { name: "Trabajo (S)", data: deptosRaw.map(d => res.rendimientoDeptos[d] ? Math.round(res.rendimientoDeptos[d].trabajo || 0) : 0) }
+              { name: "Espera (S)", data: deptosRaw.map(d => Math.round(res.rendimientoDeptos[d].espera || 0)) },
+              { name: "Trabajo (S)", data: deptosRaw.map(d => Math.round(res.rendimientoDeptos[d].trabajo || 0)) }
             ],
             chart: { type: 'bar', height: 350, stacked: true, toolbar: { show: false } },
             plotOptions: { bar: { horizontal: true, barHeight: '60%', borderRadius: 4 } },
             colors: ['#d35400', '#27ae60'],
-            xaxis: { categories: labels, labels: { style: { colors: '#94a3b8' } } },
+            xaxis: { categories: deptosRaw.map(d => d.toUpperCase()), labels: { style: { colors: '#94a3b8' } } },
             yaxis: { labels: { style: { colors: '#94a3b8' } } },
             legend: { position: 'top', labels: { colors: '#94a3b8' } },
-            dataLabels: { enabled: true, style: { fontSize: '10px' } },
             theme: { mode: 'dark' }
           };
-        } else {
-          // Inicialización segura si no hay datos de departamentos
-          this.deptoChartOptions.series = [];
-          this.deptoChartOptions.xaxis = { categories: [] };
         }
 
         this.isDataLoaded = true;
@@ -140,7 +124,6 @@ export class GlobalAnalyticsComponent implements OnInit {
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = Math.floor(seconds % 60);
-
     let res = '';
     if (hrs > 0) res += `${hrs}h `;
     if (mins > 0) res += `${mins}m `;
@@ -148,39 +131,18 @@ export class GlobalAnalyticsComponent implements OnInit {
     return res.trim();
   }
 
-  getEspecialidades(func: any): string[] {
-    return func.especialidades ? Object.keys(func.especialidades) : [];
-  }
-
   getScore(func: any): number {
     const avg = func.promedioGlobal;
     if (!avg || avg <= 0) return 0.0;
     
-    // Escala Logarítmica para Score:
-    // 0-30s: 10.0
-    // 5min: 9.0
-    // 15min: 8.0
-    // 1h: 6.0
-    // +4h: 1.0
-    if (avg <= 30) return 10.0;
-    if (avg <= 300) return 9.0 + (1 - (avg - 30) / 270);
-    if (avg <= 900) return 8.0 + (1 - (avg - 300) / 600);
-    if (avg <= 3600) return 6.0 + (2 - (avg - 900) / 2700 * 2);
-    
-    const score = 6.0 - (avg / 3600);
-    return Math.max(1.0, Math.round(score * 10) / 10);
-  }
+    let score = 0;
+    if (avg <= 30) score = 10.0;
+    else if (avg <= 300) score = 9.0 + (1 - (avg - 30) / 270);
+    else if (avg <= 900) score = 8.0 + (1 - (avg - 300) / 600);
+    else if (avg <= 3600) score = 6.0 + (2 - (avg - 900) / 2700 * 2);
+    else score = Math.max(1.0, 6.0 - (avg / 3600));
 
-  getDeptoClass(promedio: number): string {
-    if (promedio <= 600) return 'fast'; // Menos de 10 min
-    if (promedio <= 1800) return 'normal'; // Menos de 30 min
-    return 'slow';
-  }
-
-  getDeptoLabel(promedio: number): string {
-    if (promedio <= 600) return 'Muy Eficiente';
-    if (promedio <= 1800) return 'Consistente';
-    return 'Cuello de Botella';
+    return Math.round(score * 10) / 10; // TRUNCADO A 1 DECIMAL
   }
 
   getEfficiencyLabel(score: number): string {

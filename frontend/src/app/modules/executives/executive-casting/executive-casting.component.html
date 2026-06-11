@@ -8,8 +8,8 @@
     <div class="grid-container">
       <mat-card *ngFor="let exec of ejecutivos" class="exec-card glass-panel">
         <div class="card-header">
-          <div class="avatar-orb">
-            {{ exec.nombre.charAt(0).toUpperCase() }}
+          <div class="avatar-orb" [style.background-image]="'url(' + exec.avatar + ')'" [class.with-img]="exec.avatar">
+            <span *ngIf="!exec.avatar">{{ exec.nombre.charAt(0).toUpperCase() }}</span>
             <div class="orb-glow"></div>
           </div>
           <div class="title-group">

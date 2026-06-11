@@ -15,6 +15,11 @@ public class PoliticaNegocio {
     private LocalDateTime fechaCreacion;
     private LocalDateTime ultimaModificacion;
 
+    // Trazabilidad y ADN del Proceso (2do Parcial)
+    private String origenTipo;        // PDF, PROMPT, VOZ
+    private String origenContenido;   // Texto del prompt o fragmento del PDF
+    private String documentoOrigenId; // Enlace al documento en S3/DMS
+
     public PoliticaNegocio() {
         this.fechaCreacion = LocalDateTime.now();
         this.ultimaModificacion = LocalDateTime.now();
@@ -35,4 +40,11 @@ public class PoliticaNegocio {
     public void setFechaCreacion(LocalDateTime fechaCreacion) { this.fechaCreacion = fechaCreacion; }
     public LocalDateTime getUltimaModificacion() { return ultimaModificacion; }
     public void setUltimaModificacion(LocalDateTime ultimaModificacion) { this.ultimaModificacion = ultimaModificacion; }
+
+    public String getOrigenTipo() { return origenTipo; }
+    public void setOrigenTipo(String origenTipo) { this.origenTipo = origenTipo; }
+    public String getOrigenContenido() { return origenContenido; }
+    public void setOrigenContenido(String origenContenido) { this.origenContenido = origenContenido; }
+    public String getDocumentoOrigenId() { return documentoOrigenId; }
+    public void setDocumentoOrigenId(String documentoOrigenId) { this.documentoOrigenId = documentoOrigenId; }
 }

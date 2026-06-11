@@ -20,10 +20,13 @@ export interface UserProfile {
 export class AuthService {
   private userSubject = new BehaviorSubject<UserProfile | null>(null);
   user$ = this.userSubject.asObservable();
-  private apiUrl = 'http://13.217.197.171:8080/api/auth';
-  private usrUrl = 'http://13.217.197.171:8080/api/usuarios';
+  private apiUrl: string;
+  private usrUrl: string;
 
   constructor(private router: Router, private http: HttpClient) {
+    const serverIp = window.location.hostname;
+    this.apiUrl = `http://${serverIp}:8080/api/auth`;
+    this.usrUrl = `http://${serverIp}:8080/api/usuarios`;
     this.restoreSession();
   }
 
@@ -95,7 +98,9 @@ export class AuthService {
   getNombreCompleto(): string { 
     const u = this.userSubject.value;
     if (!u) return 'Usuario';
-    return `${u.nombre} ${u.apellido}`.trim(); 
+    const full = `${u.nombre} ${u.apellido}`.trim();
+    if (full === 'Usuario' || !full) return u.username || u.email.split('@')[0];
+    return full; 
   }
   getEmail(): string { return this.userSubject.value?.email || ''; }
   getAvatar(): string { return this.userSubject.value?.avatar || ''; }

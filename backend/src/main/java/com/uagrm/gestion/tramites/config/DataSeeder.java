@@ -22,15 +22,15 @@ public class DataSeeder implements CommandLineRunner {
         System.out.println(">>> INICIANDO VERIFICACIÓN DE USUARIOS (SEED DATA)...");
 
         // 1. ADMIN PRINCIPAL
-        asegurarUsuario("admin@test.com", "ADMIN", "SISTEMA", "admin", "ADMINISTRADOR");
+        asegurarUsuario("admin", "ADMIN", "SISTEMA", "admin", "ADMINISTRADOR");
 
-        // 2. ADMIN COLABORADOR (PARA FIGMA-STYLE)
-        asegurarUsuario("admin2@test.com", "ADMIN", "COLABORADOR", "admin2", "ADMINISTRADOR");
+        // 2. ADMIN COLABORADOR
+        asegurarUsuario("test", "TEST", "USER", "test", "ADMINISTRADOR");
 
         // 3. FUNCIONARIOS
-        asegurarUsuario("atencion@test.com", "PEDRO", "ATENCION", "pedro_at", "FUNCIONARIO");
-        asegurarUsuario("central@test.com", "JUAN", "CONTADOR", "juan_cont", "FUNCIONARIO");
-        asegurarUsuario("caja@test.com", "ANA", "CAJA", "ana_caja", "FUNCIONARIO");
+        asegurarUsuario("atencion", "PEDRO", "ATENCION", "atencion", "FUNCIONARIO");
+        asegurarUsuario("central", "JUAN", "CONTADOR", "central", "FUNCIONARIO");
+        asegurarUsuario("caja", "ANA", "CAJA", "caja", "FUNCIONARIO");
 
         System.out.println(">>> SEED DATA FINALIZADO EXITOSAMENTE.");
     }

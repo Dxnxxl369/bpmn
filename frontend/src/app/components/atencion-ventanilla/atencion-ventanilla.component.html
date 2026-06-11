@@ -1,65 +1,63 @@
 <div class="ventanilla-container animate-fade-in">
-      <header class="v-header">
-        <div class="h-left">
-          <mat-icon class="icon-orb">store</mat-icon>
-          <div>
-            <h2>Atención en Ventanilla</h2>
-            <p>Digitalización Inteligente de Trámites</p>
-          </div>
-        </div>
-        <button mat-icon-button (click)="dialogRef.close()"><mat-icon>close</mat-icon></button>
-      </header>
-
-      <!-- PASO 1: SELECCIÓN DE TRÁMITE -->
-      <div class="step-catalog" *ngIf="!politicaSeleccionada">
-        <h3>Selecciona el trámite a iniciar:</h3>
-        <div class="catalog-grid scroll-custom">
-          <div *ngFor="let p of catalog" class="catalog-item" (click)="seleccionarTramite(p)">
-            <mat-icon>assignment</mat-icon>
-            <span>{{ p.nombre }}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- PASO 2: DIGITALIZACIÓN (SPLIT VIEW) -->
-      <div class="split-workspace" *ngIf="politicaSeleccionada">
-        <!-- IZQUIERDA: DOCUMENTOS -->
-        <section class="doc-panel">
-          <div class="panel-head">
-            <mat-icon>upload_file</mat-icon> DOCUMENTACIÓN FÍSICA
-          </div>
-          <div class="upload-zone" (click)="fileInput.click()" [class.has-file]="fileUploaded">
-            <input type="file" #fileInput (change)="onFileSelected($event)" hidden accept="application/pdf,image/*">
-            <mat-icon class="big-icon">{{ fileUploaded ? 'task' : 'cloud_upload' }}</mat-icon>
-            <p>{{ fileUploaded ? 'Documento cargado con éxito' : 'Subir o Escanear Documento' }}</p>
-            <small *ngIf="fileName">{{ fileName }}</small>
-          </div>
-
-          <!-- NUEVO: PANEL DE INSTRUCCIÓN IA PARA EJECUTIVO -->
-          <div class="executive-ai-control" *ngIf="fileUploaded">
-             <mat-form-field appearance="outline" class="full-width premium-field">
-                <mat-label>Observación del Ejecutivo (IA)</mat-label>
-                <textarea matInput [(ngModel)]="instruccionEjecutivo" placeholder="Ej: El cliente trajo todo menos el carnet de identidad..."></textarea>
-                <mat-icon matSuffix>chat</mat-icon>
-             </mat-form-field>
-          </div>
-          
-          <button mat-raised-button class="btn-magic-fill" (click)="ejecutarMagicFill()" [disabled]="!fileUploaded || procesandoIA">
-            <mat-icon>{{ procesandoIA ? 'sync' : 'auto_awesome' }}</mat-icon>
-            {{ procesandoIA ? 'ANALIZANDO...' : 'MAGIA DEL EJECUTIVO ✨' }}
-          </button>
-          
-          <mat-progress-bar *ngIf="procesandoIA" mode="indeterminate" color="accent" class="v-loader"></mat-progress-bar>
-        </section>
-
-        <!-- DERECHA: FORMULARIO -->
-        <section class="form-panel">
-          <div class="panel-head">
-            <mat-icon>edit_note</mat-icon> FORMULARIO DE INGRESO
-          </div>
-          <div class="form-scroll scroll-custom">
-             <app-formulario-dinamico [schema]="schema" [initialData]="respuestasIA" (submitted)="finalizarTramite($event)"></app-formulario-dinamico>
-          </div>
-        </section>
+  <header class="v-header">
+    <div class="h-left">
+      <mat-icon class="icon-orb">store</mat-icon>
+      <div>
+        <h2>Atención en Ventanilla</h2>
+        <p>Digitalización Inteligente de Trámites</p>
       </div>
     </div>
+    <button mat-icon-button (click)="dialogRef.close()"><mat-icon>close</mat-icon></button>
+  </header>
+
+  <!-- PASO 1: SELECCIÓN DE TRÁMITE -->
+  <div class="step-catalog" *ngIf="!politicaSeleccionada">
+    <h3>Selecciona el trámite a iniciar:</h3>
+    <div class="catalog-grid scroll-custom">
+      <div *ngFor="let p of catalog" class="catalog-item" (click)="seleccionarTramite(p)">
+        <mat-icon>assignment</mat-icon>
+        <span>{{ p.nombre }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- PASO 2: IDENTIFICACIÓN DEL CIUDADANO -->
+  <div class="workspace-simple-centered" *ngIf="politicaSeleccionada && !identificado">
+      <div class="form-container-clean">
+          <div class="form-header-minimal">
+              <h1>Identificación del <span>Ciudadano</span></h1>
+              <p>Ingrese el C.I. de la persona que solicita el trámite.</p>
+          </div>
+          <div class="id-check-box" style="margin: 0 auto;">
+            <mat-form-field appearance="outline" class="full-width premium-field">
+               <mat-label>Cédula de Identidad (C.I.)</mat-label>
+               <input matInput [(ngModel)]="ciCiudadano" placeholder="Ej: 1234567" (keyup.enter)="confirmarIdentidad()">
+               <mat-icon matSuffix>badge</mat-icon>
+            </mat-form-field>
+            <button class="btn-confirm-id" (click)="confirmarIdentidad()" [disabled]="!ciCiudadano" style="background: var(--primary-color); color: white; border: none; padding: 18px; border-radius: 15px; font-weight: 800; cursor: pointer; width: 100%;">
+               CONFIRMAR Y EMPEZAR <mat-icon>play_arrow</mat-icon>
+            </button>
+          </div>
+      </div>
+  </div>
+
+  <!-- PASO 3: INICIO (FORMULARIO CLIENTE) -->
+  <div class="workspace-simple-centered" *ngIf="politicaSeleccionada && identificado">
+      <div class="form-container-clean scroll-custom">
+          <div class="form-header-minimal">
+              <h1>Iniciar Trámite: <span>{{ politicaSeleccionada?.nombre }}</span></h1>
+              <p>Actuando en representación de: <b>{{ ciCiudadano }}</b></p>
+          </div>
+          <app-formulario-dinamico
+            [schema]="schema"
+            [taskId]="taskIdActual"
+            [initialData]="respuestasIA"
+            [isAuditMode]="false"
+            [isPortalMode]="true"
+            [instancia]="{ clienteCi: ciCiudadano, politicaNegocioId: politicaSeleccionada?.id }"
+            (submitted)="finalizarTramite($event)"
+            (closed)="resetVentanilla()">
+          </app-formulario-dinamico>
+      </div>
+  </div>
+</div>

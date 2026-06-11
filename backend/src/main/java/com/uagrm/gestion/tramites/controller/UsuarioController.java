@@ -18,11 +18,12 @@ public class UsuarioController {
 
     private final UsuarioRepository usuarioRepository;
     private final DepartamentoRepository departamentoRepository;
+    private final com.uagrm.gestion.tramites.service.AuditoriaService auditoriaService;
 
     @GetMapping("/ejecutivos")
     public ResponseEntity<List<Usuario>> listarEjecutivos() {
         return ResponseEntity.ok(usuarioRepository.findAll().stream()
-                .filter(u -> "FUNCIONARIO".equals(u.getRol()))
+                .filter(u -> !"CIUDADANO".equals(u.getRol()))
                 .collect(Collectors.toList()));
     }
 
@@ -41,13 +42,29 @@ public class UsuarioController {
     }
 
     @PutMapping("/update")
-    public ResponseEntity<Usuario> updatePerfil(@RequestBody Usuario updatedUser) {
-        Usuario usuario = usuarioRepository.findByEmail(updatedUser.getEmail()).orElseThrow();
-        usuario.setNombre(updatedUser.getNombre());
-        usuario.setApellido(updatedUser.getApellido());
-        usuario.setUsername(updatedUser.getUsername());
-        usuario.setAvatar(updatedUser.getAvatar());
-        return ResponseEntity.ok(usuarioRepository.save(usuario));
+    public ResponseEntity<?> updatePerfil(@RequestBody Usuario updatedUser) {
+        try {
+            System.out.println(">> [PERFIL] Intentando actualizar usuario: " + updatedUser.getEmail());
+            Usuario usuario = usuarioRepository.findByEmail(updatedUser.getEmail())
+                    .orElseThrow(() -> new RuntimeException("Usuario no encontrado: " + updatedUser.getEmail()));
+            
+            usuario.setNombre(updatedUser.getNombre());
+            usuario.setApellido(updatedUser.getApellido());
+            usuario.setUsername(updatedUser.getUsername());
+            
+            if (updatedUser.getAvatar() != null && !updatedUser.getAvatar().isEmpty()) {
+                System.out.println(">> [PERFIL] Actualizando avatar (Tamaño: " + updatedUser.getAvatar().length() + " chars)");
+                usuario.setAvatar(updatedUser.getAvatar());
+            }
+            
+            Usuario saved = usuarioRepository.save(usuario);
+            System.out.println("✅ [PERFIL] Usuario actualizado con éxito");
+            auditoriaService.registrar(null, null, "ACTUALIZAR_PERFIL", "USUARIOS", saved.getId(), "Perfil actualizado: " + saved.getEmail());
+            return ResponseEntity.ok(saved);
+        } catch (Exception e) {
+            System.err.println("❌ [PERFIL] Error al actualizar: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
     }
 
     @PutMapping("/{id}/departamentos")
@@ -58,9 +75,11 @@ public class UsuarioController {
         if (!departamentoIds.isEmpty()) {
             departamentoRepository.findById(departamentoIds.get(0)).ifPresent(d -> {
                 usuario.setLaneId(d.getNombreNormalizado());
+                auditoriaService.registrar(null, null, "ASIGNAR_DEPARTAMENTO", "USUARIOS", id, "Empleado: " + usuario.getEmail() + " -> " + d.getNombreOriginal());
             });
         } else {
             usuario.setLaneId(null);
+            auditoriaService.registrar(null, null, "QUITAR_DEPARTAMENTO", "USUARIOS", id, "Empleado desvinculado: " + usuario.getEmail());
         }
         
         return ResponseEntity.ok(usuarioRepository.save(usuario));

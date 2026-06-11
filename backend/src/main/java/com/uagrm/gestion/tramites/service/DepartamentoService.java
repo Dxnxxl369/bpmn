@@ -13,13 +13,28 @@ import java.util.Optional;
 public class DepartamentoService {
 
     private final DepartamentoRepository repository;
+    private final AuditoriaService auditoriaService;
 
     public List<Departamento> listarTodos() {
         return repository.findAll();
     }
 
-    public Departamento guardarOActualizar(Departamento d) {
-        return repository.save(d);
+    public Departamento guardar(Departamento d) {
+        String accion;
+        String detalles;
+        
+        if (d.getId() != null && !d.getId().trim().isEmpty()) {
+            accion = "RENOMBRAR_DEPARTAMENTO";
+            Departamento actual = repository.findById(d.getId()).orElseThrow();
+            detalles = "De: " + actual.getNombreOriginal() + " -> A: " + d.getNombreOriginal();
+        } else {
+            accion = "CREAR_DEPARTAMENTO";
+            detalles = "Nuevo departamento: " + d.getNombreOriginal();
+        }
+        
+        Departamento saved = repository.save(d);
+        auditoriaService.registrar(null, null, accion, "DEPARTAMENTOS", saved.getId(), detalles);
+        return saved;
     }
 
     /**
@@ -52,8 +67,7 @@ public class DepartamentoService {
         Departamento nuevo = new Departamento();
         nuevo.setNombreOriginal(laneName);
         nuevo.setNombreNormalizado(normalizado); // Usar el texto procesado, no el crudo
-        repository.save(nuevo);
-        return normalizado;
+        return repository.save(nuevo).getNombreNormalizado();
     }
 
     private String normalizarTexto(String t) {

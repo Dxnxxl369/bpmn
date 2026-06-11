@@ -15,7 +15,6 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -25,6 +24,7 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -45,18 +45,14 @@ public class ProcesoMotorService {
 
     private final com.uagrm.gestion.tramites.repository.LinkedTaskRepository linkedTaskRepository;
     private final com.uagrm.gestion.tramites.repository.UserDeviceRepository userDeviceRepository;
+    private final com.uagrm.gestion.tramites.repository.DocumentoRepository documentoRepository;
     private final PushNotificationService pushNotificationService;
+    private final S3Service s3Service;
+    private final VisionService visionService;
+    private final AuditoriaService auditoriaService;
 
-    private void notificarInteresados(InstanciaProceso instancia, String titulo, String mensaje) {
-        try {
-            linkedTaskRepository.findByProcessInstanceId(instancia.getId()).forEach(link -> {
-                userDeviceRepository.findByUserId(link.getUserId()).ifPresent(device -> {
-                    pushNotificationService.sendPushNotification(device.getFcmToken(), titulo, mensaje);
-                });
-            });
-        } catch (Exception e) {
-            log.error("Error al enviar notificaciones push: " + e.getMessage());
-        }
+    public S3Service getS3Service() {
+        return this.s3Service;
     }
 
     public com.uagrm.gestion.tramites.model.PoliticaNegocio obtenerPolitica(String id) {
@@ -67,32 +63,79 @@ public class ProcesoMotorService {
         return instanciaRepository.findById(id).orElseThrow();
     }
 
-    public InstanciaProceso iniciarInstancia(String politicaId, String xmlBpmn, String solicitante) {
+    public InstanciaProceso iniciarInstancia(String politicaId, String xmlUml, String solicitante) {
+        return iniciarInstancia(politicaId, xmlUml, solicitante, null);
+    }
+
+    public InstanciaProceso iniciarInstancia(String politicaId, String xmlUml, String solicitante, String clienteCi) {
         politicaService.activarPolitica(politicaId);
         InstanciaProceso instancia = new InstanciaProceso();
         instancia.setPoliticaNegocioId(politicaId);
-        instancia.setXmlBpmn(xmlBpmn);
+        instancia.setXmlBpmn(xmlUml); 
         instancia.setSolicitanteNombre(solicitante != null ? solicitante : "Solicitante Desconocido");
+        instancia.setClienteCi(clienteCi);
         instancia.setEstado("EN_CURSO");
-        instancia.setResultadoFinal("EN_CURSO"); // AMARILLO inicialmente
+        instancia.setResultadoFinal("EN_CURSO");
         instancia.setFechaInicio(Instant.now());
         instancia.setContextoJson("{}");
 
-        // GENERAR CÓDIGO DE SEGUIMIENTO (TOKEN CLIENTE)
         String token = "UAGRM-" + (100000 + new java.util.Random().nextInt(900000));
         instancia.setCodigoSeguimiento(token);
 
         instancia = instanciaRepository.save(instancia);
+        
+        if (clienteCi != null && !clienteCi.isBlank()) {
+            List<com.uagrm.gestion.tramites.model.Documento> huerfanos = documentoRepository.findByClienteCi(clienteCi).stream()
+                .filter(d -> d.getInstanciaId() == null || d.getInstanciaId().isBlank())
+                .collect(java.util.stream.Collectors.toList());
+            
+            for (com.uagrm.gestion.tramites.model.Documento doc : huerfanos) {
+                doc.setInstanciaId(instancia.getId());
+                documentoRepository.save(doc);
+            }
+        }
+        
+        auditoriaService.registrar("SISTEMA", solicitante, "INICIO TRÁMITE UML", "MOTOR PROCESOS", instancia.getId(), "Inició el trámite con código " + token + (clienteCi != null ? " para CI: " + clienteCi : ""));
+
+        notificarCliente(instancia.getId(), clienteCi, "Trámite Iniciado", "Su solicitud ha sido recibida. Código: " + token, "#007BFF");
 
         try {
-            String startEventId = findStartEvent(xmlBpmn);
-            if (startEventId == null) throw new RuntimeException("No StartEvent found");
-            avanzarDesde(instancia, startEventId);
+            String initialNodeId = findInitialNode(xmlUml);
+            if (initialNodeId == null) throw new RuntimeException("No InitialNode found");
+            avanzarDesde(instancia, initialNodeId);
         } catch (Exception e) {
-            throw new RuntimeException("Error starting engine: " + e.getMessage());
+            throw new RuntimeException("Error starting UML engine: " + e.getMessage());
         }
 
         return instancia;
+    }
+
+    public List<com.uagrm.gestion.tramites.model.Documento> obtenerDocumentosCliente(String clienteCi) {
+        return documentoRepository.findByClienteCi(clienteCi);
+    }
+
+    public void guardarDocumentoModificado(com.uagrm.gestion.tramites.model.Documento doc) {
+        documentoRepository.save(doc);
+    }
+
+    public InstanciaProceso guardarInstancia(InstanciaProceso instancia) {
+        return instanciaRepository.save(instancia);
+    }
+
+    public void actualizarVariablesInstancia(String instanciaId, String respuestasJson) {
+        InstanciaProceso instancia = instanciaRepository.findById(instanciaId).orElseThrow();
+        try {
+            ObjectNode contexto = (ObjectNode) objectMapper.readTree(instancia.getContextoJson());
+            JsonNode nuevasRespuestas = objectMapper.readTree(respuestasJson);
+            if (nuevasRespuestas.isObject()) {
+                nuevasRespuestas.fields().forEachRemaining(entry -> contexto.set(entry.getKey(), entry.getValue()));
+            }
+            instancia.setContextoJson(objectMapper.writeValueAsString(contexto));
+            instancia.setEstado("EN_CURSO");
+            instanciaRepository.save(instancia);
+            
+            auditoriaService.registrar("CIUDADANO", "SISTEMA", "SUBSANACIÓN ENVIADA", "MOTOR PROCESOS", instancia.getId(), "El ciudadano envió correcciones de documentos.");
+        } catch (Exception e) { e.printStackTrace(); }
     }
 
     public TareaInstancia atenderTarea(String tareaId, String userEmail) {
@@ -103,14 +146,21 @@ public class ProcesoMotorService {
             
             usuarioRepository.findByEmail(userEmail).ifPresent(u -> {
                 tarea.setUsuarioId(u.getId());
+                auditoriaService.registrar(u.getId(), u.getNombre() + " " + u.getApellido(), "ATENDER TAREA", "MOTOR PROCESOS", tarea.getInstanciaProcesoId(), "Atención de tarea UML: " + tarea.getNombre());
+
+                instanciaRepository.findById(tarea.getInstanciaProcesoId()).ifPresent(inst -> {
+                    notificarCliente(inst.getId(), inst.getClienteCi(), "Trámite en Atención", 
+                        "Un funcionario ha comenzado a procesar su solicitud en: " + tarea.getNombre(), "#007BFF");
+                });
             });
-            
+
             return tareaRepository.save(tarea);
         }
         return tarea;
     }
 
     public TareaInstancia completarTarea(String tareaId, String respuestasJson) {
+        log.info("âš¡ [MOTOR-DEBUG] Iniciando COMPLETAR TAREA: {}", tareaId);
         TareaInstancia tarea = tareaRepository.findById(tareaId).orElseThrow();
         tarea.setEstado("COMPLETADA");
         tarea.setRespuestasJson(respuestasJson);
@@ -122,95 +172,43 @@ public class ProcesoMotorService {
         try {
             ObjectNode contexto = (ObjectNode) objectMapper.readTree(instancia.getContextoJson());
             JsonNode nuevasRespuestas = objectMapper.readTree(respuestasJson);
-            
             if (nuevasRespuestas.isObject()) {
-                nuevasRespuestas.fields().forEachRemaining(entry -> {
-                    String keyOriginal = entry.getKey();
-                    String keyNormalizada = keyOriginal.toLowerCase().replace(" ", "").trim();
-                    contexto.set(keyOriginal, entry.getValue());
-                    
-                    // CAPTURA INTELIGENTE POR PATRONES (Nombre y Apellido)
-                    if (keyNormalizada.contains("nombre") || keyNormalizada.contains("apellido") || keyNormalizada.contains("solicitante") || keyNormalizada.contains("cliente")) {
-                        String nombreActual = instancia.getSolicitanteNombre() != null ? instancia.getSolicitanteNombre() : "";
-                        String valorNuevo = entry.getValue().asText();
-                        
-                        if (nombreActual.isEmpty() || nombreActual.equals("Solicitante Desconocido")) {
-                             instancia.setSolicitanteNombre(valorNuevo);
-                        } else if (!nombreActual.contains(valorNuevo)) {
-                             // Si ya tenemos el nombre y llega el apellido (o viceversa), concatenamos
-                             instancia.setSolicitanteNombre(nombreActual + " " + valorNuevo);
-                        }
-                    }
-                    
-                    // Aseguramos que campos críticos también estén en minúsculas para el frontend
-                    if (keyNormalizada.contains("ci") || keyNormalizada.contains("cedula") || keyNormalizada.contains("identifi")) {
-                        contexto.set("ci_global", entry.getValue());
-                    }
-                    if (keyNormalizada.contains("correo") || keyNormalizada.contains("email")) {
-                        contexto.set("email_global", entry.getValue());
-                    }
-                    if (keyNormalizada.contains("telef") || keyNormalizada.contains("celular")) {
-                        contexto.set("telefono_global", entry.getValue());
-                    }
-                });
+                nuevasRespuestas.fields().forEachRemaining(entry -> contexto.set(entry.getKey(), entry.getValue()));
             }
-            
-            // SI LA TAREA ES DE RECHAZO, MARCAR RESULTADO COMO RECHAZADO (ROJO)
-            if (tarea.getNombre().toLowerCase().contains("rechazo") || tarea.getNombre().toLowerCase().contains("denegado")) {
-                instancia.setResultadoFinal("RECHAZADO");
-            }
-
             instancia.setContextoJson(objectMapper.writeValueAsString(contexto));
             instanciaRepository.save(instancia);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        } catch (Exception e) { e.printStackTrace(); }
 
-        EstadisticaTarea est = new EstadisticaTarea();
-        est.setPoliticaNegocioId(instancia.getPoliticaNegocioId());
-        est.setTaskDefinitionId(tarea.getTaskDefinitionId());
-        est.setLaneId(tarea.getLaneId());
-        est.setNodoNombre(tarea.getNombre());
-        
-        // REFUERZO DE CAPTURA DE USUARIO (MODO EXPERTO)
-        String uId = tarea.getUsuarioId();
-        if (uId == null || uId.isEmpty() || "SISTEMA".equals(uId)) {
-            try {
-                Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-                uId = principal.toString(); // En JWT es el email
-            } catch (Exception e) {
-                uId = "SISTEMA";
+        auditoriaService.registrar(tarea.getUsuarioId(), "FUNCIONARIO", "COMPLETAR TAREA UML", "MOTOR PROCESOS", instancia.getId(), "Completó: " + tarea.getNombre());
+
+        try {
+            EstadisticaTarea stats = new EstadisticaTarea();
+            stats.setPoliticaNegocioId(tarea.getPoliticaNegocioId());
+            stats.setTaskDefinitionId(tarea.getTaskDefinitionId());
+            stats.setNodoNombre(tarea.getNombre());
+            stats.setUsuarioId(tarea.getUsuarioId());
+            stats.setLaneId(tarea.getLaneId());
+            stats.setFechaRegistro(LocalDateTime.now());
+
+            usuarioRepository.findById(tarea.getUsuarioId()).ifPresent(u -> 
+                stats.setUsuarioNombre(u.getNombre() + " " + u.getApellido())
+            );
+
+            if (tarea.getFechaInicio() != null && tarea.getFechaAtencion() != null) {
+                stats.setEsperaSegundos(Duration.between(tarea.getFechaInicio(), tarea.getFechaAtencion()).getSeconds());
             }
+            if (tarea.getFechaAtencion() != null && tarea.getFechaCompletado() != null) {
+                stats.setEjecucionSegundos(Duration.between(tarea.getFechaAtencion(), tarea.getFechaCompletado()).getSeconds());
+            }
+            if (tarea.getFechaInicio() != null && tarea.getFechaCompletado() != null) {
+                stats.setDuracionSegundos(Duration.between(tarea.getFechaInicio(), tarea.getFechaCompletado()).getSeconds());
+            }
+
+            estadisticaRepository.save(stats);
+            log.info("✅ Estadística registrada para: {}", stats.getUsuarioNombre());
+        } catch (Exception e) {
+            log.error("Error al registrar estadísticas: {}", e.getMessage());
         }
-
-        final String finalId = uId;
-        usuarioRepository.findById(finalId != null ? finalId : "")
-            .or(() -> usuarioRepository.findByEmail(finalId))
-            .ifPresentOrElse(u -> {
-                est.setUsuarioId(u.getId());
-                String completo = (u.getNombre() != null ? u.getNombre() : "") + " " + (u.getApellido() != null ? u.getApellido() : "");
-                est.setUsuarioNombre(completo.trim().isEmpty() ? u.getUsername() : completo.trim());
-            }, () -> {
-                // Si no encontramos al usuario por ID/Email, guardamos lo que tengamos como nombre
-                est.setUsuarioNombre(finalId);
-                est.setUsuarioId(null);
-            });
-
-        Instant inicio = tarea.getFechaInicio();
-        Instant fin = tarea.getFechaCompletado() != null ? tarea.getFechaCompletado() : Instant.now();
-        // FALLBACK: Si no hay fecha de atención, el tiempo de ejecución es el total desde inicio hasta fin
-        Instant atencion = tarea.getFechaAtencion() != null ? tarea.getFechaAtencion() : inicio;
-
-        long espera = Duration.between(inicio, atencion).getSeconds();
-        long ejecucion = Duration.between(atencion, fin).getSeconds();
-        long total = Duration.between(inicio, fin).getSeconds();
-
-        est.setEsperaSegundos(espera > 0 ? espera : 0);
-        est.setEjecucionSegundos(ejecucion > 0 ? ejecucion : total);
-        est.setDuracionSegundos(total);
-        est.setFechaRegistro(java.time.LocalDateTime.now());
-        
-        estadisticaRepository.save(est);
 
         avanzarDesde(instancia, tarea.getTaskDefinitionId());
 
@@ -218,19 +216,21 @@ public class ProcesoMotorService {
     }
 
     private void avanzarDesde(InstanciaProceso instancia, String nodoActualId) {
+        log.info("ðŸ”🔍 [MOTOR-DEBUG] Avanzando proceso desde el nodo: {}", nodoActualId);
         try {
             Document doc = parseXml(instancia.getXmlBpmn());
             List<Element> siguientes = findNextElements(doc, nodoActualId);
+            log.info("ðŸ”🔍 [MOTOR-DEBUG] Nodos candidatos encontrados: {}", siguientes.size());
 
             if (siguientes.isEmpty()) {
-                // SI NO HAY SIGUIENTE Y EL ESTADO ERA EN_CURSO, FINALIZAR COMO ÉXITO SI NO HUBO RECHAZO
                 if (!"FINALIZADO".equals(instancia.getEstado())) {
+                    log.info("ðŸŽ¯ [MOTOR-DEBUG] Â¡FIN DE CAMINO ALCANZADO! Finalizando...");
                     instancia.setEstado("FINALIZADO");
-                    if ("EN_CURSO".equals(instancia.getResultadoFinal())) {
-                        instancia.setResultadoFinal("APROBADO"); // VERDE
-                    }
                     instancia.setFechaFin(Instant.now());
                     instanciaRepository.save(instancia);
+
+                    consolidarDocumentosFinales(instancia);
+                    notificarClienteFinalizacion(instancia);
                 }
                 return;
             }
@@ -238,81 +238,43 @@ public class ProcesoMotorService {
             Element nextElement = seleccionarCaminoCorrecto(siguientes, instancia);
             if (nextElement == null) return;
 
-            String type = nextElement.getTagName();
+            String type = nextElement.getTagName().toLowerCase();
             String id = nextElement.getAttribute("id");
+            log.info("ðŸš€ [MOTOR-DEBUG] Siguiente nodo detectado: {} (Tipo: {})", id, type);
 
-            if (type.contains("userTask")) {
+            if (type.contains("opaqueaction") || type.contains("action")) {
                 crearTarea(instancia, nextElement);
-                notificarInteresados(instancia, "Tu trámite ha avanzado", "Nueva tarea: " + nextElement.getAttribute("name"));
-            } else if (type.contains("exclusiveGateway")) {
+            } else if (type.contains("decisionnode")) {
                 avanzarDesde(instancia, id);
-            } else if (type.contains("endEvent")) {
+            } else if (type.contains("finalnode")) {
+                log.info("ðŸŽ¯ [MOTOR-DEBUG] Â¡NODO FINAL UML ALCANZADO! (ID: {}). Finalizando trámite...", id);
                 instancia.setEstado("FINALIZADO");
-                if ("EN_CURSO".equals(instancia.getResultadoFinal())) {
-                    instancia.setResultadoFinal("APROBADO");
-                }
                 instancia.setFechaFin(Instant.now());
                 instanciaRepository.save(instancia);
-                notificarInteresados(instancia, "¡Trámite Finalizado!", "Tu solicitud ha concluido con éxito.");
+
+                consolidarDocumentosFinales(instancia);
+                notificarClienteFinalizacion(instancia);
             } else {
+                log.info("âž¡ï¸ [MOTOR-DEBUG] Nodo de salto (Jump): {}. Avanzando...", type);
                 avanzarDesde(instancia, id);
             }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+
+        } catch (Exception e) { e.printStackTrace(); }
     }
+
 
     private Element seleccionarCaminoCorrecto(List<Element> candidatos, InstanciaProceso instancia) throws Exception {
         if (candidatos.size() == 1) return findNodeById(parseXml(instancia.getXmlBpmn()), candidatos.get(0).getAttribute("targetRef"));
 
         JsonNode contexto = objectMapper.readTree(instancia.getContextoJson());
-        String decisionHumana = "";
-        
-        if (contexto.has("decision_motor")) {
-            JsonNode node = contexto.get("decision_motor");
-            // Si es un objeto (ej: {value: 'Si'}), extraemos el valor. Si es texto, directo.
-            decisionHumana = node.isObject() ? node.path("value").asText() : node.asText();
-        }
-        
-        decisionHumana = decisionHumana.trim();
+        String decision = contexto.path("decision_motor").asText().trim();
 
-        log.info("CEREBRO MOTOR: Evaluando decisión '{}' para instancia {}", decisionHumana, instancia.getId());
-
-        // 1. PRIMERA PASADA: Búsqueda de coincidencia exacta o literal (Máxima prioridad)
         for (Element flow : candidatos) {
-            String label = flow.getAttribute("name").toLowerCase().trim();
-            if (label.equalsIgnoreCase(decisionHumana)) {
-                log.info("RUTA EXACTA: '{}' coincide con la flecha '{}'.", decisionHumana, label);
+            String name = flow.getAttribute("name");
+            if (name != null && name.equalsIgnoreCase(decision)) {
                 return findNodeById(parseXml(instancia.getXmlBpmn()), flow.getAttribute("targetRef"));
             }
         }
-
-        // 2. SEGUNDA PASADA: Lógica semántica ampliada
-        for (Element flow : candidatos) {
-            String label = flow.getAttribute("name").toLowerCase().trim();
-            String targetRef = flow.getAttribute("targetRef");
-
-            if (label.isEmpty()) continue;
-
-            boolean coincide = false;
-            
-            // Normalizar variaciones de ÉXITO (Si, Sí, SÍ, Aprobado, etc.)
-            String dH = decisionHumana.toLowerCase();
-            if (dH.contains("si") || dH.contains("sí") || dH.contains("aprobado") || dH.contains("factible") || dH.contains("exito") || dH.contains("aceptar")) {
-                if (label.contains("si") || label.contains("sí") || label.contains("aprobado") || label.contains("factible") || label.contains("exito") || label.contains("aceptar")) coincide = true;
-            } 
-            // Normalizar variaciones de RECHAZO (No, Rechazado, etc.)
-            else if (dH.contains("no") || dH.contains("rechazado") || dH.contains("fallo") || dH.contains("cancelar") || dH.contains("denegar")) {
-                if (label.contains("no") || label.contains("rechazado") || label.contains("fallo") || label.contains("cancelar") || label.contains("denegar")) coincide = true;
-            }
-
-            if (coincide) {
-                log.info("RUTA SEMÁNTICA: '{}' coincide con la flecha '{}'. Saltando a {}", decisionHumana, label, targetRef);
-                return findNodeById(parseXml(instancia.getXmlBpmn()), targetRef);
-            }
-        }
-
-        log.warn("ADVERTENCIA: No se encontró una ruta que coincida con '{}'. Usando ruta por defecto.", decisionHumana);
         return findNodeById(parseXml(instancia.getXmlBpmn()), candidatos.get(0).getAttribute("targetRef"));
     }
 
@@ -323,23 +285,110 @@ public class ProcesoMotorService {
         tarea.setTaskDefinitionId(taskElement.getAttribute("id"));
         tarea.setNombre(taskElement.getAttribute("name"));
         tarea.setEstado("PENDIENTE");
-        tarea.setSolicitanteNombre(instancia.getSolicitanteNombre());
         tarea.setFechaInicio(Instant.now());
-        
+
         String rawLaneName = resolveRawLaneName(instancia.getXmlBpmn(), tarea.getTaskDefinitionId());
         String normalizedDept = departamentoService.resolverDepartamentoReal(rawLaneName);
-        
+
         tarea.setLaneId(normalizedDept);
-        instancia.setLaneId(normalizedDept);
-        instanciaRepository.save(instancia);
         tareaRepository.save(tarea);
 
         messagingTemplate.convertAndSend("/topic/tareas/" + normalizedDept, tarea);
+
+        notificarCliente(instancia.getId(), instancia.getClienteCi(), "Actualización de Trámite", 
+            "Su trámite ha pasado a la etapa: " + tarea.getNombre(), "#FFD700");
+    }
+
+    public void notificarCliente(String instanciaId, String clienteCi, String titulo, String mensaje, String colorHex) {
+        log.info("ðŸ”🔍 [MOTOR-DEBUG] Iniciando ruteo de notificaciÃ³n para Instancia: {}", instanciaId);
+        
+        java.util.Set<String> tokensEnviados = new java.util.HashSet<>();
+
+        if (clienteCi != null && !clienteCi.isBlank()) {
+            userDeviceRepository.findByUserId(clienteCi).ifPresent(device -> {
+                if (device.getFcmToken() != null && tokensEnviados.add(device.getFcmToken())) {
+                    log.info("ðŸ”🔍 [MOTOR-DEBUG] Notificando a CI directo: {}", clienteCi);
+                    pushNotificationService.sendPushNotification(device.getFcmToken(), titulo, mensaje, colorHex);
+                }
+            });
+
+            usuarioRepository.findByCi(clienteCi).ifPresent(u -> {
+                userDeviceRepository.findByUserId(u.getId()).ifPresent(device -> {
+                    if (device.getFcmToken() != null && tokensEnviados.add(device.getFcmToken())) {
+                        log.info("ðŸ”🔍 [MOTOR-DEBUG] Notificando a Usuario {} vinculado por CI {}", u.getNombre(), clienteCi);
+                        pushNotificationService.sendPushNotification(device.getFcmToken(), titulo, mensaje, colorHex);
+                    }
+                });
+            });
+        }
+
+        if (instanciaId != null) {
+            List<com.uagrm.gestion.tramites.model.LinkedTask> vinculaciones = linkedTaskRepository.findByProcessInstanceId(instanciaId);
+            for (com.uagrm.gestion.tramites.model.LinkedTask link : vinculaciones) {
+                if (link.getUserId() != null && !link.getUserId().equals("GUEST")) {
+                    userDeviceRepository.findByUserId(link.getUserId()).ifPresent(device -> {
+                        if (device.getFcmToken() != null && tokensEnviados.add(device.getFcmToken())) {
+                            log.info("ðŸ”🔍 [MOTOR-DEBUG] Notificando a Vinculado (UserID): {}", link.getUserId());
+                            pushNotificationService.sendPushNotification(device.getFcmToken(), titulo, mensaje, colorHex);
+                        }
+                    });
+                }
+                if (link.getDeviceToken() != null && tokensEnviados.add(link.getDeviceToken())) {
+                    log.info("ðŸ”🔍 [MOTOR-DEBUG] Notificando a Vinculado (Token Directo/Invitado)");
+                    pushNotificationService.sendPushNotification(link.getDeviceToken(), titulo, mensaje, colorHex);
+                }
+            }
+        }
+    }
+
+    private void consolidarDocumentosFinales(InstanciaProceso instancia) {
+        log.info(">> [IA-CONSOLIDACIÓN] Iniciando conversión de documentos oficiales a PDF...");
+        List<com.uagrm.gestion.tramites.model.Documento> oficiales = documentoRepository.findByInstanciaIdAndEsColaborativoTrueAndEsActualTrue(instancia.getId());
+
+        for (com.uagrm.gestion.tramites.model.Documento htmlDoc : oficiales) {
+            try {
+                if (htmlDoc.getContenidoHtml() == null || htmlDoc.getContenidoHtml().isBlank()) continue;
+
+                byte[] pdfBytes = visionService.convertHtmlToPdf(htmlDoc.getContenidoHtml());
+                if (pdfBytes != null) {
+                    String nombrePdf = htmlDoc.getNombreArchivo().replace(".html", "") + "_OFICIAL.pdf";
+                    String key = "documentos/" + java.util.UUID.randomUUID() + "_" + nombrePdf;
+
+                    String urlS3 = s3Service.subirArchivoConKey(key, new java.io.ByteArrayInputStream(pdfBytes), pdfBytes.length, "application/pdf");
+                    com.uagrm.gestion.tramites.model.Documento entregable = new com.uagrm.gestion.tramites.model.Documento();
+                    entregable.setInstanciaId(instancia.getId());
+                    entregable.setClienteCi(instancia.getClienteCi());
+                    entregable.setNombreArchivo(nombrePdf);
+                    entregable.setUrlS3(urlS3);
+                    entregable.setEsActual(true);
+                    entregable.setEsColaborativo(true);
+                    entregable.setTipoDocumento("ENTREGABLE_FINAL");
+                    entregable.setVersion(htmlDoc.getVersion());
+                    entregable.setFuncionarioNombre(htmlDoc.getFuncionarioNombre());
+                    entregable.setDepartamentoNombre(htmlDoc.getDepartamentoNombre());
+                    entregable.setFechaSubida(Instant.now());
+
+                    documentoRepository.save(entregable);
+                    log.info("✅ [IA-CONSOLIDACIÓN] Documento consolidado: {}", urlS3);
+                }
+            } catch (Exception e) {
+                log.error("❌ [IA-CONSOLIDACIÓN] Error al consolidar {}: {}", htmlDoc.getNombreArchivo(), e.getMessage());
+            }
+        }
+    }
+
+    private void notificarClienteFinalizacion(InstanciaProceso instancia) {
+        List<com.uagrm.gestion.tramites.model.Documento> oficiales = documentoRepository.findByInstanciaIdAndEsColaborativoTrueAndEsActualTrue(instancia.getId());
+        String msgFinal = "¡Felicidades! Su trámite ha concluido con éxito.";
+        if (!oficiales.isEmpty()) {
+            msgFinal += " Tiene " + oficiales.size() + " documento(s) oficial(es) listos para descargar.";
+        }
+        notificarCliente(instancia.getId(), instancia.getClienteCi(), "Trámite Finalizado", msgFinal, "#28A745");
     }
 
     private List<Element> findNextElements(Document doc, String currentId) {
         List<Element> outgoingFlows = new ArrayList<>();
-        NodeList sequences = doc.getElementsByTagNameNS("*", "sequenceFlow");
+        NodeList sequences = doc.getElementsByTagNameNS("*", "ControlFlow");
         for (int i = 0; i < sequences.getLength(); i++) {
             Element flow = (Element) sequences.item(i);
             if (flow.getAttribute("sourceRef").equals(currentId)) outgoingFlows.add(flow);
@@ -356,27 +405,25 @@ public class ProcesoMotorService {
         return null;
     }
 
-    private String findStartEvent(String xml) throws Exception {
+    private String findInitialNode(String xml) throws Exception {
         Document doc = parseXml(xml);
-        NodeList starts = doc.getElementsByTagNameNS("*", "startEvent");
+        NodeList starts = doc.getElementsByTagNameNS("*", "InitialNode");
         return starts.getLength() > 0 ? ((Element) starts.item(0)).getAttribute("id") : null;
     }
 
     public String obtenerDepartamentoInicial(String xml) {
         try {
-            Document doc = parseXml(xml);
-            String startEventId = findStartEvent(xml);
-            if (startEventId == null) return null;
+            String initialNodeId = findInitialNode(xml);
+            if (initialNodeId == null) return null;
 
-            List<Element> siguientes = findNextElements(doc, startEventId);
+            Document doc = parseXml(xml);
+            List<Element> siguientes = findNextElements(doc, initialNodeId);
             if (siguientes.isEmpty()) return null;
 
-            // Buscamos el primer nodo de tarea (userTask) o el que siga al gateway
             Element primerNodo = siguientes.get(0);
             String targetId = primerNodo.getAttribute("targetRef");
             
-            // Si el primer nodo es un Gateway, seguimos buscando el primer UserTask
-            if (targetId.toLowerCase().contains("gateway")) {
+            if (targetId.toLowerCase().contains("decision") || targetId.toLowerCase().contains("node")) {
                 List<Element> despuesGateway = findNextElements(doc, targetId);
                 if (!despuesGateway.isEmpty()) {
                     targetId = despuesGateway.get(0).getAttribute("targetRef");
@@ -386,7 +433,7 @@ public class ProcesoMotorService {
             String rawLaneName = resolveRawLaneName(xml, targetId);
             return departamentoService.resolverDepartamentoReal(rawLaneName);
         } catch (Exception e) {
-            log.error("Error al obtener departamento inicial", e);
+            log.error("Error al obtener departamento inicial UML", e);
             return null;
         }
     }
@@ -394,12 +441,12 @@ public class ProcesoMotorService {
     private String resolveRawLaneName(String xml, String taskId) {
         try {
             Document doc = parseXml(xml);
-            NodeList lanes = doc.getElementsByTagNameNS("*", "lane");
-            for (int i = 0; i < lanes.getLength(); i++) {
-                Element lane = (Element) lanes.item(i);
-                NodeList refs = lane.getElementsByTagNameNS("*", "flowNodeRef");
+            NodeList partitions = doc.getElementsByTagNameNS("*", "ActivityPartition");
+            for (int i = 0; i < partitions.getLength(); i++) {
+                Element partition = (Element) partitions.item(i);
+                NodeList refs = partition.getElementsByTagNameNS("*", "nodeRef");
                 for (int j = 0; j < refs.getLength(); j++) {
-                    if (refs.item(j).getTextContent().equals(taskId)) return lane.getAttribute("name");
+                    if (refs.item(j).getTextContent().trim().equals(taskId)) return partition.getAttribute("name");
                 }
             }
         } catch (Exception e) { e.printStackTrace(); }
@@ -410,8 +457,6 @@ public class ProcesoMotorService {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         factory.setNamespaceAware(true);
         DocumentBuilder builder = factory.newDocumentBuilder();
-        org.xml.sax.InputSource is = new org.xml.sax.InputSource(new java.io.StringReader(xml));
-        is.setEncoding("UTF-8");
-        return builder.parse(is);
+        return builder.parse(new org.xml.sax.InputSource(new java.io.StringReader(xml)));
     }
 }

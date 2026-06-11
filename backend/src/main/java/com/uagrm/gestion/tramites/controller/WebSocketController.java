@@ -1,73 +1,101 @@
 package com.uagrm.gestion.tramites.controller;
 
+import com.uagrm.gestion.tramites.service.AuditoriaService;
+import com.uagrm.gestion.tramites.service.PoliticaNegocioService;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
+import lombok.RequiredArgsConstructor;
 
-import java.util.Map;
 import java.util.Collection;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Controller
+@RequiredArgsConstructor
 public class WebSocketController {
 
-    @Autowired
-    private SimpMessagingTemplate messagingTemplate;
+    private final SimpMessagingTemplate messagingTemplate;
+    private final PoliticaNegocioService politicaService;
+    private final AuditoriaService auditoriaService;
 
-    // MEMORIA DE USUARIOS EN LÍNEA
-    private static final Map<String, Object> usuariosEnLinea = new ConcurrentHashMap<>();
+    // MAPA MAESTRO: Estado total de cada sesión conectada
+    private final Map<String, Map<String, Object>> usuariosEnLinea = new ConcurrentHashMap<>();
 
-    @MessageMapping("/politica/{id}/editar")
-    public void sincronizarDiagrama(@DestinationVariable String id, Map<String, Object> payload) {
-        System.out.println("📢 [WS SERVER] Difundiendo cambio de diagrama para: " + id);
-        messagingTemplate.convertAndSend("/topic/politica/" + id, payload);
+    @MessageMapping("/global-presence")
+    public void presenceGlobal(Map<String, Object> payload) {
+        String userId = (String) payload.get("userId");
+        String sessionId = (String) payload.get("sessionId");
+        String action = (String) payload.get("action");
+
+        if (userId != null && sessionId != null) {
+            String key = userId + "_" + sessionId;
+            
+            if ("leave".equals(action)) {
+                usuariosEnLinea.remove(key);
+            } else {
+                Map<String, Object> existing = usuariosEnLinea.get(key);
+                if (existing != null) {
+                    if (payload.get("avatar") == null) payload.put("avatar", existing.get("avatar"));
+                    if (payload.get("activity") == null) payload.put("activity", existing.get("activity"));
+                    if (payload.get("politicaId") == null) payload.put("politicaId", existing.get("politicaId"));
+                }
+                payload.put("timestamp", System.currentTimeMillis());
+                usuariosEnLinea.put(key, payload);
+            }
+        }
+        
+        // FORZAR ENVÍO EXPLÍCITO A TODOS
+        messagingTemplate.convertAndSend("/topic/global-presence", usuariosEnLinea.values());
     }
 
-    @MessageMapping("/form-presence/{id}")
-    @SendTo("/topic/form-presence/{id}")
-    public Object sincronizarPresenciaFormulario(@DestinationVariable String id, Object payload) {
+    @MessageMapping("/politica/{id}/editar")
+    public void actualizarXml(@DestinationVariable String id, Map<String, Object> payload) {
+        messagingTemplate.convertAndSend("/topic/politica/" + id, payload);
+        politicaService.actualizarXmlAsync(id, (String) payload.get("xml"), (String) payload.get("userName"));
+    }
+
+    @MessageMapping("/politica/{id}/mover")
+    @SendTo("/topic/politica/{id}/movimientos")
+    public Map<String, Object> moverNodo(@DestinationVariable String id, Map<String, Object> payload) {
         return payload;
     }
 
     @MessageMapping("/form-sync/{id}")
     @SendTo("/topic/form-sync/{id}")
-    public Object sincronizarEsquemaFormulario(@DestinationVariable String id, Object payload) {
+    public Map<String, Object> sincronizarEsquema(@DestinationVariable String id, Map<String, Object> payload) {
         return payload;
     }
 
-    /**
-     * Canal Global de Presencia: Devuelve siempre la colección completa.
-     */
-    @MessageMapping("/global-presence")
-    @SendTo("/topic/global-presence")
-    public Collection<Object> presenceGlobal(Map<String, Object> payload) {
-        String userId = (String) payload.get("userId");
-        String sessionId = (String) payload.get("sessionId");
-        String action = (String) payload.get("action");
-
-        if (userId != null && !userId.isEmpty()) {
-            String key = userId + "_" + (sessionId != null ? sessionId : "default");
-            
-            if ("leave".equals(action)) {
-                usuariosEnLinea.remove(key);
-            } else {
-                // LIMPIEZA PROACTIVA: Eliminar cualquier entrada previa del mismo userId pero con diferente sessionId
-                // Esto evita que si cerró la pestaña sin hacer logout, se queden sus clones.
-                usuariosEnLinea.keySet().removeIf(k -> k.startsWith(userId + "_") && !k.equals(key));
-                
-                usuariosEnLinea.put(key, payload);
-            }
-        }
-        return usuariosEnLinea.values();
+    @MessageMapping("/form-presence/{id}")
+    @SendTo("/topic/form-presence/{id}")
+    public Map<String, Object> sincronizarPresenciaFormulario(@DestinationVariable String id, Map<String, Object> payload) {
+        return payload;
     }
 
-    @MessageMapping("/global-chat")
-    @SendTo("/topic/global-chat")
-    public Object collaborativeChat(Object message) {
-        return message;
+    // --- CANALES DE EDICIÓN COLABORATIVA DE DOCUMENTOS (FASE FINAL) ---
+
+    @MessageMapping("/doc-sync/{instanciaId}")
+    @SendTo("/topic/doc-sync/{instanciaId}")
+    public Map<String, Object> sincronizarDocumento(@DestinationVariable String instanciaId, Map<String, Object> payload) {
+        // Payload: { content: "HTML del documento...", sender: "email@..." }
+        return payload;
+    }
+
+    @MessageMapping("/doc-cursors/{instanciaId}")
+    @SendTo("/topic/doc-cursors/{instanciaId}")
+    public Map<String, Object> sincronizarCursoresDocumento(@DestinationVariable String instanciaId, Map<String, Object> payload) {
+        // Payload: { x: 150, y: 300, name: "María (Legal)", sender: "email@..." }
+        return payload;
+    }
+
+    @MessageMapping("/ai-highlight/{id}")
+    @SendTo("/topic/ai-highlight/{id}")
+    public Map<String, Object> notificarResaltadoIA(@DestinationVariable String id, Map<String, Object> payload) {
+        // Payload: { fieldId, docId, coords: {x, y, w, h}, label }
+        return payload;
     }
 
     @MessageMapping("/private-chat")

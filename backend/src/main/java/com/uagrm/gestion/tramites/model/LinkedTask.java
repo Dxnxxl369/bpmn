@@ -13,7 +13,9 @@ import org.springframework.data.mongodb.core.mapping.Document;
 public class LinkedTask {
     @Id
     private String id;
-    private String processInstanceId; // El ID del trámite (token)
-    private String userId;           // El ID del usuario que lo vinculó
-    private String verificador;      // El dato que se usó para validar (ej. correo)
+    private String processInstanceId; // El ID del trÃ¡mite (token)
+    private String userId;           // El ID del usuario que lo vinculÃ³
+    private String deviceToken;      // El token del dispositivo (para anÃ³nimos)
+    private String verificador;      // El dato que se usÃ³ para validar (ej. correo)
 }
+

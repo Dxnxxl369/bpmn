@@ -23,6 +23,12 @@
                     <div class="proposal-preview-diagram-full">
                        <app-bpmn-editor [politica]="proposal"></app-bpmn-editor>
                     </div>
+                    
+                    <!-- BOTÓN FLOTANTE DE INFO -->
+                    <button class="btn-info-proposal-float" [matTooltip]="proposal.descripcion">
+                       <mat-icon>psychology</mat-icon> RESUMEN SEMÁNTICO IA
+                    </button>
+
                     <button class="btn-save-proposal-float" (click)="confirmarGuardado(proposal, i)">
                        <mat-icon>save</mat-icon> GUARDAR EN BORRADORES
                     </button>
@@ -113,13 +119,15 @@
                 <mat-icon>arrow_back</mat-icon>
               </button>
               <span class="status-badge-mini" [class.is-pub]="politicaSeleccionada.estado === 'ACTIVA'">{{ politicaSeleccionada.estado }}</span>
-              <h2 class="policy-name-compact">{{ politicaSeleccionada.nombre }}</h2>
+              <div class="policy-name-marquee-container">
+                <h2 class="policy-name-marquee">{{ politicaSeleccionada.nombre }}</h2>
+              </div>
             </div>
             <div class="presence-bar-pro">
                <div class="avatar-stack">
                   <div class="avatar-pro me">
                      <img [src]="miAvatar" alt="Tú">
-                     <div class="name-tag-pro">Tú ({{ miNombre }})</div>
+                     <div class="name-tag-pro">Tú</div>
                   </div>
                   <div *ngFor="let user of colaboradores" class="avatar-pro" [style.border-color]="user.color">
                      <div class="status-halo" [style.background]="user.color"></div>
@@ -129,16 +137,21 @@
                   </div>
                </div>
             </div>
-            <div class="studio-actions-right">            
-              <button class="publish-btn-premium" 
+            <div class="studio-actions-horizontal">            
+              <button class="btn-history-compact" (click)="mostrarVersiones = !mostrarVersiones; mostrarVersiones && cargarVersiones()">
+                <mat-icon>history</mat-icon> {{ mostrarVersiones ? 'CERRAR' : 'HISTORIAL' }}
+              </button>
+              
+              <button class="publish-btn-compact" 
                       [class.locked-pro]="!listoParaPublicar"
                       (click)="publicarProceso()" 
                       *ngIf="politicaSeleccionada.estado === 'BORRADOR' && !tareaSeleccionada">
                 <mat-icon>{{ listoParaPublicar ? 'rocket_launch' : 'lock' }}</mat-icon> 
-                {{ listoParaPublicar ? 'CERTIFICAR Y PUBLICAR' : 'BLOQUEADO: REVISAR FORMULARIOS' }}
+                <span>{{ listoParaPublicar ? 'PUBLICAR' : 'REVISAR' }}</span>
               </button>
-              <div class="read-only-badge" *ngIf="politicaSeleccionada.estado === 'ACTIVA'">
-                 <mat-icon>visibility</mat-icon> MODO LECTURA
+
+              <div class="read-only-badge-compact" *ngIf="politicaSeleccionada.estado === 'ACTIVA'">
+                 <mat-icon>verified</mat-icon> PROD
               </div>
             </div>
           </div>
@@ -148,16 +161,16 @@
                 <div class="ribbon-group"><span class="group-label">VOLVER</span><button (click)="tareaSeleccionada = null; activeTabIndex = 1" class="ribbon-tool-btn back"><mat-icon>arrow_back</mat-icon></button></div>
                 <div class="ribbon-divider"></div>
                 <div class="ribbon-group"><span class="group-label">CAMPOS</span><div class="tools-cluster">
-                  <button (click)="agregarCampo('text')"><mat-icon>short_text</mat-icon></button>
-                  <button (click)="agregarCampo('textarea')"><mat-icon>notes</mat-icon></button>
-                  <button (click)="agregarCampo('number')"><mat-icon>pin</mat-icon></button>
-                  <button (click)="agregarCampo('date')"><mat-icon>calendar_today</mat-icon></button>
-                  <button (click)="agregarCampo('select')"><mat-icon>list</mat-icon></button>
+                  <button (click)="agregarCampo('text')" matTooltip="Texto (Línea simple)"><mat-icon>short_text</mat-icon></button>
+                  <button (click)="agregarCampo('textarea')" matTooltip="Área de Texto (Párrafo)"><mat-icon>notes</mat-icon></button>
+                  <button (click)="agregarCampo('number')" matTooltip="Campo Numérico"><mat-icon>pin</mat-icon></button>
+                  <button (click)="agregarCampo('date')" matTooltip="Selector de Fecha"><mat-icon>calendar_today</mat-icon></button>
+                  <button (click)="agregarCampo('select')" matTooltip="Menú de Selección (ComboBox)"><mat-icon>list</mat-icon></button>
                 </div></div>
                 <div class="ribbon-divider"></div>
                 <div class="ribbon-group"><span class="group-label">AVANZADO</span><div class="tools-cluster">
-                  <button (click)="agregarCampo('file')"><mat-icon>upload_file</mat-icon></button>
-                  <button (click)="agregarCampo('button')"><mat-icon>smart_button</mat-icon></button>
+                  <button (click)="agregarCampo('file')" matTooltip="Subir Archivo/Documento"><mat-icon>upload_file</mat-icon></button>
+                  <button (click)="agregarCampo('button')" matTooltip="Botón de Acción"><mat-icon>smart_button</mat-icon></button>
                 </div></div>
                 
                 <div class="action-btns-pro">
@@ -176,13 +189,14 @@
                 </div>
              </ng-container>
 
-             <ng-container *ngIf="activeTabIndex === 0 && !tareaSeleccionada">
-                <div class="ribbon-group"><span class="group-label">OBJETOS BPMN</span><div class="tools-cluster">
-                  <button (click)="bpmnEditor.crearElemento('bpmn:StartEvent')" matTooltip="Evento Inicio"><mat-icon>play_circle</mat-icon></button>
-                  <button (click)="bpmnEditor.crearElemento('bpmn:Task')" matTooltip="Nueva Actividad"><mat-icon>assignment</mat-icon></button>
-                  <button (click)="bpmnEditor.crearElemento('bpmn:ExclusiveGateway')" matTooltip="Decisión"><mat-icon>alt_route</mat-icon></button>
-                  <button (click)="bpmnEditor.crearElemento('bpmn:EndEvent')" matTooltip="Evento Fin"><mat-icon>stop_circle</mat-icon></button>
-                  <button (click)="bpmnEditor.activarConector()" matTooltip="Trazar Flecha (Conector)" class="btn-connector"><mat-icon>trending_flat</mat-icon></button>
+             <ng-container *ngIf="activeTabIndex === 0 && !tareaSeleccionada && !modoCapsula">
+                <div class="ribbon-group"><span class="group-label">ELEMENTOS UML 2.5</span><div class="tools-cluster">
+                  <button (click)="bpmnEditor.addStart()" matTooltip="Nodo Inicio"><mat-icon>play_circle</mat-icon></button>
+                  <button (click)="bpmnEditor.addActivity()" matTooltip="Nueva Acción"><mat-icon>assignment</mat-icon></button>
+                  <button (click)="bpmnEditor.addDecision()" matTooltip="Punto de Decisión"><mat-icon>alt_route</mat-icon></button>
+                  <button (click)="bpmnEditor.addEnd()" matTooltip="Nodo Fin"><mat-icon>stop_circle</mat-icon></button>
+                  <button (click)="bpmnEditor.addFork()" matTooltip="Barra Fork/Join"><mat-icon>horizontal_rule</mat-icon></button>
+                  <button (click)="bpmnEditor.addLane()" matTooltip="Agregar Calle (Departamento)"><mat-icon>view_column</mat-icon></button>
                 </div></div>
                 <div class="ribbon-divider"></div>
                 <div class="ribbon-group"><span class="group-label">CÁMARA</span><div class="tools-cluster">
@@ -196,7 +210,9 @@
                   <button (click)="bpmnEditor.redo()"><mat-icon>redo</mat-icon></button>
                 </div></div>
                 <div class="action-btns-pro" *ngIf="activeTabIndex === 0">
-                <button class="btn-ia-edit" matTooltip="Regenerar flujo con IA"><mat-icon>auto_awesome</mat-icon> REGENERAR IA</button>
+                <button class="btn-ia-edit" (click)="descargarXML()" matTooltip="Descargar XML UML para depuración" style="background: #2d3238 !important; border-color: #4f46e5 !important;">
+                  <mat-icon>download</mat-icon> XML
+                </button>
                 <button class="btn-save-draft-pro" (click)="guardarBPMN()"><mat-icon>save</mat-icon> GUARDAR</button>
               </div>
              </ng-container>
@@ -209,12 +225,13 @@
             <mat-tab label="DIAGRAMA BPMN">
                <!-- Contenedor siempre vivo: Se oculta moviéndolo fuera de pantalla para mantener su tamaño y conexión -->
                <div class="diagram-fullscreen-wrapper" 
+                    [class.read-only-mode-active]="modoCapsula"
                     [style.position]="activeTabIndex === 0 ? 'relative' : 'absolute'"
                     [style.left]="activeTabIndex === 0 ? '0' : '-9999px'"
                     [style.visibility]="activeTabIndex === 0 ? 'visible' : 'hidden'"
                     [style.width]="'100%'"
                     [style.height]="'100%'">
-                  <app-bpmn-editor #bpmnEditor [politica]="politicaSeleccionada"></app-bpmn-editor>
+                  <app-bpmn-editor #bpmnEditor [politica]="politicaSeleccionada" [isReadOnly]="modoCapsula"></app-bpmn-editor>
                </div>
             </mat-tab>
             <mat-tab label="ESTUDIO DE FORMULARIOS">
@@ -282,15 +299,51 @@
                       </header>
                       <div class="preview-scroll-box scroll-custom">
                          <div class="device-frame-mini">
-                            <app-formulario-dinamico [schema]="schemaPrevia"></app-formulario-dinamico>
+                            <header class="device-header"><div class="dots"><span></span><span></span><span></span></div><div class="device-title">PREVISUALIZACIÓN</div></header>
+                            <div class="device-content-mini">
+                               <app-formulario-dinamico [schema]="schemaPrevia" [isDesignMode]="true"></app-formulario-dinamico>
+                            </div>
                          </div>
                       </div>
                    </div>
                 </main>
               </div>
-            </mat-tab>
-            <mat-tab label="INTELIGENCIA OPERATIVA" *ngIf="activeTabIndex === 2">
-               <app-analiticas-dashboard [politicaId]="politicaSeleccionada.id!"></app-analiticas-dashboard>
+              </mat-tab>
+              <mat-tab label="DETALLES Y ADN">
+               <div class="policy-dna-layout animate-fade-in" *ngIf="politicaSeleccionada">
+                  <div class="dna-main-grid">
+                     <section class="dna-card semantic-card">
+                        <header>
+                           <mat-icon>psychology</mat-icon>
+                           <h3>Interpretación del Proceso</h3>
+                        </header>
+                        <textarea [(ngModel)]="politicaSeleccionada.descripcion" (change)="guardarCambiosDetalle()" placeholder="Descripción del proceso..."></textarea>
+                        <div class="ia-badge">META-DATA PARA MODELOS NLP</div>
+                     </section>
+
+                     <section class="dna-card origin-card">
+                        <header>
+                           <mat-icon>fingerprint</mat-icon>
+                           <h3>Huella Digital de Origen (ADN)</h3>
+                        </header>
+                        <div class="origin-type-box">
+                           <span class="type-label">MODO DE CAPTURA:</span>
+                           <span class="type-value badge-origin">{{ politicaSeleccionada.origenTipo || 'MANUAL' }}</span>
+                        </div>
+                        <div class="origin-content-box">
+                           <label>FRAGMENTO FUENTE (PARA TENSORFLOW):</label>
+                           <div class="content-scroll">
+                              {{ politicaSeleccionada.origenContenido || 'No hay contenido de origen registrado.' }}
+                           </div>
+                        </div>
+                        <div class="origin-footer" *ngIf="politicaSeleccionada.documentoOrigenId">
+                           <button class="btn-view-source-pdf" (click)="verPdfOrigen(politicaSeleccionada.documentoOrigenId)">
+                              <mat-icon>picture_as_pdf</mat-icon> VER PDF ORIGINAL (REFERENCIA)
+                           </button>
+                        </div>
+                     </section>
+                  </div>
+               </div>
             </mat-tab>
           </mat-tab-group>
 
@@ -334,11 +387,22 @@
                            </label>
                         </div>
                         <div class="options-editor-pro animate-fade-in" *ngIf="field.type === 'select'">
-                           <div class="options-header"><span>OPCIONES DEL MENU</span><button class="add-opt-btn" (click)="agregarOpcion(field)"><mat-icon>add</mat-icon></button></div>
+                           <div class="options-header">
+                              <span>OPCIONES DEL MENU</span>
+                              <button class="add-opt-btn" (click)="agregarOpcion(field)" *ngIf="!esCampoProtegido(field.id)">
+                                 <mat-icon>add</mat-icon>
+                              </button>
+                           </div>
                            <div class="options-grid">
                               <div class="option-chip-pro" *ngFor="let opt of field.options; let optIdx = index; trackBy: trackByIndex">
-                                 <input [(ngModel)]="field.options![optIdx]" (change)="sincronizarJSON()"><button class="del-opt-btn" (click)="eliminarOpcion(field, optIdx)"><mat-icon>close</mat-icon></button>
+                                 <input [(ngModel)]="field.options![optIdx]" (change)="sincronizarJSON()" [disabled]="esCampoProtegido(field.id)">
+                                 <button class="del-opt-btn" (click)="eliminarOpcion(field, optIdx)" *ngIf="!esCampoProtegido(field.id)">
+                                    <mat-icon>close</mat-icon>
+                                 </button>
                               </div>
+                           </div>
+                           <div class="protected-info-msg" *ngIf="esCampoProtegido(field.id)">
+                              <mat-icon>info</mat-icon> Estas opciones se sincronizan automáticamente con el diagrama BPMN.
                            </div>
                         </div>
                         <div class="hover-glow-effect"></div>
@@ -354,11 +418,60 @@
 
                    <div class="device-simulator glass-panel" [class.is-view-only]="politicaSeleccionada.estado === 'ACTIVA'">
                       <header class="device-header"><div class="dots"><span></span><span></span><span></span></div><div class="device-title">VISTA DE PRODUCCION</div><mat-icon>verified_user</mat-icon></header>
-                      <div class="device-content"><app-formulario-dinamico [schema]="jsonSchemaString" [highlightId]="campoResaltadoId" (fieldHovered)="campoResaltadoId = $event"></app-formulario-dinamico></div>
+                      <div class="device-content"><app-formulario-dinamico [schema]="jsonSchemaString" [highlightId]="campoResaltadoId" (fieldHovered)="onFieldHover($event)" [isDesignMode]="true"></app-formulario-dinamico></div>
                    </div>
                 </section>
             </div>
           </div>
+        </div>
+
+        <!-- PANEL DE VERSIONES (SIDEBAR) -->
+        <aside class="versions-sidebar glass-panel animate-slide-in" *ngIf="mostrarVersiones">
+           <header class="sidebar-header">
+              <mat-icon>history</mat-icon>
+              <h3>Historial de Cambios</h3>
+              <button class="btn-close-mini" (click)="mostrarVersiones = false"><mat-icon>close</mat-icon></button>
+           </header>
+           
+           <div class="versions-list scroll-custom-mini">
+              <div *ngFor="let v of versiones" class="version-item" 
+                   [class.latest]="v.version === versiones[0].version"
+                   [class.viewing-now]="modoCapsula && versionEnCapsula?.id === v.id"
+                   (click)="verVersionPasada(v)">
+                 <div class="v-number">v{{ v.version }}</div>
+                 <div class="v-info">
+                    <strong>{{ v.creadoPor }}</strong>
+                    <small>{{ v.creadoEn | date:'medium' }}</small>
+                    <span class="viewing-badge" *ngIf="modoCapsula && versionEnCapsula?.id === v.id">VIENDO AHORA</span>
+                 </div>
+                 <button class="btn-restore" (click)="$event.stopPropagation(); restaurarVersion(v)" matTooltip="Restaurar esta versión">
+                    <mat-icon>settings_backup_restore</mat-icon>
+                 </button>
+              </div>
+              <div class="empty-versions" *ngIf="versiones.length === 0">
+                 <mat-icon>auto_stories</mat-icon>
+                 <p>No hay historial todavía.</p>
+              </div>
+           </div>
+        </aside>
+
+        <!-- BANNER FLOTANTE MODO CÁPSULA -->
+        <div class="capsule-controls-overlay animate-pop-in" *ngIf="modoCapsula">
+            <div class="capsule-msg">
+                <mat-icon>history</mat-icon>
+                <div class="txt">
+                    <strong>MODO CÁPSULA <span class="badge-capsule-v">v{{ versionEnCapsula?.version }}</span></strong>
+                    <span>Viendo versión antigua (Solo Lectura)</span>
+                </div>
+            </div>
+            <div class="capsule-actions">
+                <button class="btn-cancel-capsule" (click)="volverAlPresente()">
+                    <mat-icon>arrow_forward</mat-icon> VOLVER AL PRESENTE
+                </button>
+                <button class="btn-confirm-restore" (click)="restaurarVersionDesdeCapsula()">
+                    <mat-icon>settings_backup_restore</mat-icon> RESTAURAR ESTA VERSIÓN
+                </button>
+            </div>
         </div>
       </div>
     </div>

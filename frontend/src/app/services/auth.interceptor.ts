@@ -1,10 +1,10 @@
 import { HttpInterceptorFn } from '@angular/common/http';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
-  // VOLVER A LA LÓGICA ANTERIOR QUE SÍ SERVÍA
   const token = localStorage.getItem('token');
   
-  if (token) {
+  // VERIFICACIÓN ESTRICTA: Evitar enviar "Bearer null" o "Bearer undefined"
+  if (token && token !== 'null' && token !== 'undefined' && token.length > 10) {
     const authReq = req.clone({
       setHeaders: {
         Authorization: `Bearer ${token}`

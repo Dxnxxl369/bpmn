@@ -23,6 +23,7 @@ import java.io.ByteArrayInputStream;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import com.uagrm.gestion.tramites.model.PoliticaNegocio;
 
 @Slf4j
 @Service
@@ -36,339 +37,219 @@ public class AIOrchestratorService {
     private String apiKey;
 
     private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-    private static final String MODEL    = "llama-3.3-70b-versatile";//"llama-3.1-8b-instant";//"llama-3.3-70b-versatile";
+    private static final String MODEL    = "llama-3.3-70b-versatile";
 
-    // Constantes de Layout (Efecto Escalera + Anti-Colisión)
-    private static final int POOL_X          = 160;
-    private static final int POOL_Y          = 80;
-    private static final int POOL_LABEL_W    = 30;   
-    private static final int LANE_HEIGHT     = 180;
-    private static final int FIRST_NODE_X    = 270;  
-    private static final int NODE_X_STEP     = 200;  
-    private static final int TASK_W          = 120;
-    private static final int TASK_H          = 80;
-    private static final int GW_SIZE         = 50;
-    private static final int EVT_SIZE        = 36;
-
-    // =========================================================================
-    // analyzeAndExtractProcesses (Lógica DEF Original)
-    // =========================================================================
-    public List<String> analyzeAndExtractProcesses(String fullText) {
+    public List<Map<String, String>> discoverProcesses(String input, String mode) {
         String systemPrompt = """
-            Eres un Arquitecto de Procesos Senior. Identifica los TRÁMITES PRINCIPALES del texto.
+            Eres un Arquitecto de Procesos Senior. Tu tarea es analizar el contenido e identificar todos los procesos de negocio descritos.
             REGLAS:
-            1. Si el texto describe un ÚNICO flujo continuo, devuelve UN SOLO nombre.
-            2. Si el texto describe MÚLTIPLES trámites independientes, devuelve los nombres SEPARADOS POR COMAS.
-            3. Salida EXCLUSIVA: solo el texto con los nombres. Sin markdown, viñetas ni introducciones.
+            1. Devuelve un ARRAY JSON: [{"nombre": "...", "fragmento": "..."}].
+            2. "fragmento": Es el texto original EXACTO (párrafo completo) de origen para ese proceso.
+            3. Salida EXCLUSIVA: JSON puro.
             """;
-        String userPrompt = "Extrae los nombres de los trámites principales:\n\n" + fullText;
+        
+        String userPrompt = String.format("Modo: %s. Contenido:\\n%s", mode, input.length() > 8000 ? input.substring(0, 8000) : input);
+        
         try {
-            String content = callGroq(userPrompt, systemPrompt);
-            return Arrays.stream(content.split(","))
-                         .map(String::trim)
-                         .filter(s -> !s.isEmpty())
-                         .toList();
+            String raw = callGroq(userPrompt, systemPrompt);
+            String cleaned = cleanResponseUniversal(raw);
+            JsonNode node = objectMapper.readTree(cleaned);
+            List<Map<String, String>> result = new ArrayList<>();
+            if (node.isArray()) {
+                for (JsonNode item : node) {
+                    Map<String, String> m = new HashMap<>();
+                    m.put("nombre", item.path("nombre").asText("Proceso Nuevo"));
+                    m.put("fragmento", item.path("fragmento").asText(input));
+                    result.add(m);
+                }
+            } else {
+                Map<String, String> m = new HashMap<>();
+                m.put("nombre", node.path("nombre").asText("Proceso Nuevo"));
+                m.put("fragmento", node.path("fragmento").asText(input));
+                result.add(m);
+            }
+            return result;
         } catch (Exception e) {
-            log.error("Error al extraer procesos", e);
-            return List.of("Proceso de Gestión");
+            log.error("Error en descubrimiento", e);
+            return List.of(Map.of("nombre", "Proceso Detectado", "fragmento", input));
         }
     }
 
-    // =========================================================================
-    // generateBPMNXml (Lógica DEF Original)
-    // =========================================================================
-    public String generateBPMNXml(String processName, String fullContextText) {
+    public String generatePureUmlXml(String processName, String fragment) {
         String systemPrompt = """
-            Eres un Arquitecto BPMN 2.0 experto. Genera EXCLUSIVAMENTE la semántica XML pura.
+            Eres un Ingeniero de Software experto en UML 2.5. Tu ÚNICA tarea es generar el XML de un Activity Diagram.
+            
+            ESQUEMA XML REQUERIDO (Usa exactamente estas etiquetas):
+            <uml:Activity xmlns:uml="http://www.omg.org/spec/UML/20131001" id="Activity_1" name="NOMBRE">
+              <uml:ActivityPartition id="P1" name="Departamento">
+                <uml:nodeRef>N1</uml:nodeRef>
+              </uml:ActivityPartition>
+              <uml:InitialNode id="Start" name="Inicio"><uml:outgoing>F1</uml:outgoing></uml:InitialNode>
+              <uml:OpaqueAction id="N1" name="Tarea"><uml:incoming>F1</uml:incoming><uml:outgoing>F2</uml:outgoing></uml:OpaqueAction>
+              <uml:ActivityFinalNode id="End" name="Fin"><uml:incoming>F2</uml:incoming></uml:ActivityFinalNode>
+              <uml:ControlFlow id="F1" sourceRef="Start" targetRef="N1"/>
+            </uml:Activity>
 
-            ESTRUCTURA OBLIGATORIA (respeta este orden de elementos exactamente):
-            <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
-                              xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
-                              xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
-                              xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
-                              id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn">
-              <bpmn:collaboration id="Collaboration_1">
-                <bpmn:participant id="Participant_1" name="NOMBRE" processRef="Process_1"/>
-              </bpmn:collaboration>
-              <bpmn:process id="Process_1" isExecutable="true">
-                <bpmn:laneSet id="LaneSet_1">
-                  <bpmn:lane id="Lane_X" name="Departamento X">
-                    <bpmn:flowNodeRef>StartEvent_1</bpmn:flowNodeRef>
-                    <bpmn:flowNodeRef>Task_A</bpmn:flowNodeRef>
-                  </bpmn:lane>
-                </bpmn:laneSet>
-                <bpmn:startEvent id="StartEvent_1" name="Inicio">
-                  <bpmn:outgoing>Flow_1</bpmn:outgoing>
-                </bpmn:startEvent>
-                <bpmn:userTask id="Task_A" name="Nombre Tarea">
-                  <bpmn:incoming>Flow_1</bpmn:incoming>
-                  <bpmn:outgoing>Flow_2</bpmn:outgoing>
-                </bpmn:userTask>
-                <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Task_A"/>
-              </bpmn:process>
-            </bpmn:definitions>
-
-            REGLAS CRÍTICAS:
-            1. El <bpmn:process> es HERMANO de <bpmn:collaboration>, NUNCA hijo de <bpmn:participant>.
-            2. ABSOLUTAMENTE TODOS los nodos (startEvent, tareas, gateways, endEvents) DEBEN estar en un lane via <bpmn:flowNodeRef>.
-            3. Los IDs en flowNodeRef deben ser IDÉNTICOS a los id= de los nodos.
-            4. userTask=humanos, serviceTask=sistemas, exclusiveGateway=decisiones.
-            5. Nodos con incoming/outgoing referenciando sequenceFlows válidos.
-            6. Cada <bpmn:sequenceFlow> saliente de un exclusiveGateway DEBE tener el atributo name="Sí" o name="No" según la decisión.
-            7. NO incluyas bpmndi, dc:Bounds ni coordenadas. Solo semántica pura.
-            8. NO incluyas triple backtick ni markdown. Solo XML.
+            REGLAS:
+            1. Cada actor o departamento es una <uml:ActivityPartition>.
+            2. Si el actor es EXTERNO (ej. Cliente, Solicitante, Ciudadano, Paciente), DEBES añadir isExternal="true" a su partición. Ejemplo: <uml:ActivityPartition id="P1" name="CLIENTE" isExternal="true">
+            3. Todos los nodos deben estar dentro de una partición via <uml:nodeRef>.
+            4. Salida EXCLUSIVA: XML puro.
             """;
 
-        String userPrompt = String.format(
-            "Genera el XML BPMN 2.0 semántico para: '%s'. Un lane por departamento. Flujo: %s",
-            processName, fullContextText
-        );
+        String userPrompt = String.format("Genera el XML UML 2.5 para el proceso '%s' basado en este fragmento:\\n%s", processName, fragment);
 
         try {
-            String raw      = cleanXmlResponse(callGroq(userPrompt, systemPrompt));
-            String repaired = repairSemanticXml(raw);
-            return injectDiagramBlock(repaired);
+            String raw = callGroq(userPrompt, systemPrompt);
+            return repairSemanticXml(cleanXmlResponse(raw));
         } catch (Exception e) {
-            log.error("Error en generateBPMNXml", e);
+            log.error("Error en generación de XML puro", e);
             return "";
         }
     }
 
-    // =========================================================================
-    // repairSemanticXml (Lógica DEF Original)
-    // =========================================================================
+    public String generateBPMNXml(String processName, String fullContextText) {
+        return generatePureUmlXml(processName, fullContextText);
+    }
+
+    public Map<String, String> triage(String userMessage, List<PoliticaNegocio> politicas) {
+        StringBuilder context = new StringBuilder("Lista de Trámites Disponibles:\\n");
+        for (PoliticaNegocio p : politicas) {
+            context.append(String.format("- ID: %s | Nombre: %s | Descripción: %s | Fragmento: %s\\n", 
+                p.getId(), p.getNombre(), p.getDescripcion(), p.getOrigenContenido()));
+        }
+
+        String systemPrompt = """
+            Eres el Orientador Virtual de la UAGRM. Tu función es hablar DIRECTAMENTE con el ciudadano para recomendarle un trámite.
+            
+            REGLAS DE TONO Y ESTILO:
+            1. Diríjase al usuario siempre de "Usted" (Ej: "Le sugerimos...", "Basado en su necesidad...").
+            2. Sea BREVE, FORMAL y CORDIAL. 
+            3. Hable como si el software estuviera conversando con la persona.
+            4. PROHIBIDO usar términos técnicos como "fragmento", "política", "id", "prompt" o "sistema". Refiérase a ellos como "trámites" o "servicios".
+            
+            REGLAS DE FORMATO:
+            1. Responde ÚNICAMENTE en formato JSON: {"politicaId": "...", "razon": "..."}.
+            2. "politicaId": El ID del trámite más adecuado.
+            3. "razon": El mensaje directo para el ciudadano (Ej: "Le sugerimos el trámite de Diversión para que pueda gestionar su ingreso al cine de forma correcta").
+            4. Salida EXCLUSIVA: JSON puro.
+            """;
+
+        try {
+            String raw = callGroq("Mensaje del Usuario: " + userMessage + "\\n\\n" + context.toString(), systemPrompt);
+            String cleaned = cleanResponseUniversal(raw);
+            JsonNode node = objectMapper.readTree(cleaned);
+            Map<String, String> res = new HashMap<>();
+            res.put("politicaId", node.path("politicaId").isNull() ? null : node.path("politicaId").asText());
+            res.put("razon", node.path("razon").asText("No pude determinar el trámite exacto."));
+            return res;
+        } catch (Exception e) {
+            log.error("Error en Triage IA", e);
+            return Map.of("politicaId", "null", "razon", "Error interno al procesar la solicitud.");
+        }
+    }
+
+    private String cleanResponseUniversal(String raw) {
+        if (raw == null) return "";
+        String clean = raw.trim();
+        
+        // 1. Eliminar bloques markdown
+        if (clean.contains("```")) {
+            int first = clean.indexOf("```");
+            int last = clean.lastIndexOf("```");
+            if (last > first) {
+                String inside = clean.substring(first + 3, last).trim();
+                if (inside.startsWith("json")) inside = inside.substring(4).trim();
+                if (inside.startsWith("xml")) inside = inside.substring(3).trim();
+                clean = inside;
+            }
+        }
+        
+        // 2. Si es XML, extraer solo el bloque <...>
+        if (clean.contains("<") && clean.contains(">")) {
+            int start = clean.indexOf("<");
+            int end = clean.lastIndexOf(">");
+            if (end > start) return clean.substring(start, end + 1);
+        }
+        
+        // 3. Si es JSON, extraer solo el bloque {...} o [...]
+        if (clean.contains("{") || clean.contains("[")) {
+            int start = Math.min(
+                clean.indexOf("{") == -1 ? Integer.MAX_VALUE : clean.indexOf("{"),
+                clean.indexOf("[") == -1 ? Integer.MAX_VALUE : clean.indexOf("[")
+            );
+            int end = Math.max(clean.lastIndexOf("}"), clean.lastIndexOf("]"));
+            if (start != Integer.MAX_VALUE && end != -1 && end > start) {
+                return clean.substring(start, end + 1);
+            }
+        }
+        
+        return clean.trim();
+    }
+
     public String repairSemanticXml(String xml) {
+        if (xml == null || !xml.contains("<")) return "";
         try {
             Document doc = parseXml(xml);
             Element root = doc.getDocumentElement();
 
-            NodeList processes = doc.getElementsByTagNameNS("*", "process");
-            for (int i = 0; i < processes.getLength(); i++) {
-                Element proc = (Element) processes.item(i);
-                Node parent = proc.getParentNode();
-                if (parent != null && !parent.isSameNode(root)) {
-                    log.warn("Reparando: process movido a definitions.");
-                    parent.removeChild(proc);
-                    root.appendChild(proc);
-                }
-            }
-
+            // 1. Obtener todos los IDs de nodos reales definidos en el XML
             Set<String> realNodeIds = new HashSet<>();
-            for (String tag : new String[]{"startEvent","endEvent","userTask","serviceTask","task",
-                    "exclusiveGateway","parallelGateway","inclusiveGateway",
-                    "intermediateCatchEvent","intermediateThrowEvent"}) {
+            String[] tags = {"InitialNode", "ActivityFinalNode", "OpaqueAction", "DecisionNode", "ForkNode", "JoinNode", "FlowFinalNode"};
+            for (String tag : tags) {
                 NodeList nl = doc.getElementsByTagNameNS("*", tag);
+                if (nl.getLength() == 0) nl = doc.getElementsByTagName(tag);
                 for (int i = 0; i < nl.getLength(); i++) {
                     String id = ((Element) nl.item(i)).getAttribute("id");
-                    if (!id.isBlank()) realNodeIds.add(id);
+                    if (!id.isEmpty()) realNodeIds.add(id);
                 }
             }
 
-            List<Node> toRemove = new ArrayList<>();
-            NodeList refs = doc.getElementsByTagNameNS("*", "flowNodeRef");
-            Set<String> referencedByLane = new HashSet<>();
+            // 2. Obtener todos los IDs que ya están referenciados en alguna partición
+            Set<String> referencedIds = new HashSet<>();
+            NodeList refs = doc.getElementsByTagNameNS("*", "nodeRef");
+            if (refs.getLength() == 0) refs = doc.getElementsByTagName("nodeRef");
             for (int i = 0; i < refs.getLength(); i++) {
-                String refId = refs.item(i).getTextContent().trim();
-                if (!realNodeIds.contains(refId)) {
-                    toRemove.add(refs.item(i));
-                } else {
-                    referencedByLane.add(refId);
-                }
+                referencedIds.add(refs.item(i).getTextContent().trim());
             }
-            toRemove.forEach(n -> n.getParentNode().removeChild(n));
 
-            Set<String> orphanNodes = new HashSet<>(realNodeIds);
-            orphanNodes.removeAll(referencedByLane);
-            if (!orphanNodes.isEmpty()) {
-                NodeList lanes = doc.getElementsByTagNameNS("*", "lane");
-                if (lanes.getLength() > 0) {
-                    Element lastLane = (Element) lanes.item(lanes.getLength() - 1);
-                    for (String orphanId : orphanNodes) {
-                        Element fnRef = doc.createElementNS("http://www.omg.org/spec/BPMN/20100524/MODEL", "bpmn:flowNodeRef");
-                        fnRef.setTextContent(orphanId);
-                        lastLane.appendChild(fnRef);
+            // 3. Encontrar nodos huérfanos
+            Set<String> orphans = new HashSet<>(realNodeIds);
+            orphans.removeAll(referencedIds);
+
+            // 4. Adoptar huérfanos en la primera partición disponible
+            if (!orphans.isEmpty()) {
+                NodeList partitions = doc.getElementsByTagNameNS("*", "ActivityPartition");
+                if (partitions.getLength() == 0) partitions = doc.getElementsByTagName("ActivityPartition");
+                
+                if (partitions.getLength() > 0) {
+                    Element firstLane = (Element) partitions.item(0);
+                    for (String orphanId : orphans) {
+                        log.info("Backend Reparador: Adoptando nodo huérfano {} en la partición {}", orphanId, firstLane.getAttribute("name"));
+                        Element nodeRef = doc.createElement("uml:nodeRef");
+                        nodeRef.setTextContent(orphanId);
+                        firstLane.appendChild(nodeRef);
                     }
                 }
-            }
-
-            Set<String> removedFlowIds = new HashSet<>();
-            NodeList flows = doc.getElementsByTagNameNS("*", "sequenceFlow");
-            List<Node> badFlows = new ArrayList<>();
-            for (int i = 0; i < flows.getLength(); i++) {
-                Element f = (Element) flows.item(i);
-                if (!realNodeIds.contains(f.getAttribute("sourceRef")) ||
-                    !realNodeIds.contains(f.getAttribute("targetRef"))) {
-                    removedFlowIds.add(f.getAttribute("id"));
-                    badFlows.add(f);
-                }
-            }
-            badFlows.forEach(n -> n.getParentNode().removeChild(n));
-
-            for (String tag : new String[]{"incoming","outgoing"}) {
-                NodeList ioRefs = doc.getElementsByTagNameNS("*", tag);
-                List<Node> badIo = new ArrayList<>();
-                for (int i = 0; i < ioRefs.getLength(); i++) {
-                    if (removedFlowIds.contains(ioRefs.item(i).getTextContent().trim()))
-                        badIo.add(ioRefs.item(i));
-                }
-                badIo.forEach(n -> n.getParentNode().removeChild(n));
             }
 
             return serializeDoc(doc);
         } catch (Exception e) {
-            log.error("repairSemanticXml falló: {}", e.getMessage());
-            return xml;
+            log.warn("XML mal formado en reparación, intentando limpieza básica: {}", e.getMessage());
+            int start = xml.indexOf("<");
+            int end = xml.lastIndexOf(">");
+            return (start != -1 && end > start) ? xml.substring(start, end + 1) : xml;
         }
     }
 
-    // =========================================================================
-    // injectDiagramBlock (Lógica DEF + Anti-Colisión por Celda)
-    // =========================================================================
-    public String injectDiagramBlock(String semanticXml) {
-        try {
-            Document doc = parseXml(semanticXml);
-            Element root = doc.getDocumentElement();
-
-            NodeList processes = doc.getElementsByTagNameNS("*", "process");
-            if (processes.getLength() == 0) return semanticXml;
-            Element processElement = (Element) processes.item(0);
-            String processId = processElement.getAttribute("id").isEmpty() ? "Process_1" : processElement.getAttribute("id");
-            processElement.setAttribute("id", processId);
-
-            NodeList collabs = doc.getElementsByTagNameNS("*", "collaboration");
-            Element collabElement = collabs.getLength() == 0 ? doc.createElementNS("*", "bpmn:collaboration") : (Element) collabs.item(0);
-            if (collabs.getLength() == 0) {
-                collabElement.setAttribute("id", "Collaboration_1");
-                root.insertBefore(collabElement, processElement);
-            }
-            String collabId = collabElement.getAttribute("id");
-
-            NodeList parts = collabElement.getElementsByTagNameNS("*", "participant");
-            if (parts.getLength() == 0) {
-                Element participant = doc.createElementNS("*", "bpmn:participant");
-                participant.setAttribute("id", "Participant_1");
-                participant.setAttribute("name", processElement.getAttribute("name").isEmpty() ? "Proceso" : processElement.getAttribute("name"));
-                participant.setAttribute("processRef", processId);
-                collabElement.appendChild(participant);
-            }
-
-            Map<String, List<String>> adj = new HashMap<>();
-            Map<String, String> nodeToLane = new HashMap<>();
-            Map<String, String> nodeType = new HashMap<>();
-            List<String> laneOrder = new ArrayList<>();
-
-            NodeList lanes = doc.getElementsByTagNameNS("*", "lane");
-            for (int i = 0; i < lanes.getLength(); i++) {
-                Element lane = (Element) lanes.item(i);
-                String lId = lane.getAttribute("id");
-                laneOrder.add(lId);
-                NodeList fnRefs = lane.getElementsByTagNameNS("*", "flowNodeRef");
-                for (int j = 0; j < fnRefs.getLength(); j++) nodeToLane.put(fnRefs.item(j).getTextContent().trim(), lId);
-            }
-
-            String[] tags = {"startEvent","endEvent","userTask","serviceTask","exclusiveGateway","parallelGateway","task"};
-            for (String tag : tags) {
-                NodeList nl = doc.getElementsByTagNameNS("*", tag);
-                for (int i = 0; i < nl.getLength(); i++) {
-                    String id = ((Element) nl.item(i)).getAttribute("id");
-                    if (!id.isEmpty()) nodeType.put(id, tag);
-                }
-            }
-
-            List<FlowInfo> seqFlows = new ArrayList<>();
-            NodeList flows = doc.getElementsByTagNameNS("*", "sequenceFlow");
-            for (int i = 0; i < flows.getLength(); i++) {
-                Element f = (Element) flows.item(i);
-                String src = f.getAttribute("sourceRef"), tgt = f.getAttribute("targetRef");
-                adj.computeIfAbsent(src, k -> new ArrayList<>()).add(tgt);
-                seqFlows.add(new FlowInfo(f.getAttribute("id"), src, tgt, f.getAttribute("name")));
-            }
-
-            Map<String, Integer> depths = new HashMap<>();
-            Queue<String> queue = new LinkedList<>();
-            NodeList starts = doc.getElementsByTagNameNS("*", "startEvent");
-            for (int i = 0; i < starts.getLength(); i++) {
-                String id = ((Element) starts.item(i)).getAttribute("id");
-                depths.put(id, 0); queue.add(id);
-            }
-
-            int maxD = 0;
-            while (!queue.isEmpty()) {
-                String curr = queue.poll();
-                int d = depths.get(curr);
-                maxD = Math.max(maxD, d);
-                for (String neighbor : adj.getOrDefault(curr, Collections.emptyList())) {
-                    if (!depths.containsKey(neighbor)) { depths.put(neighbor, d + 1); queue.add(neighbor); }
-                }
-            }
-            for (String id : nodeType.keySet()) if (!depths.containsKey(id)) depths.put(id, ++maxD);
-
-            // ANTI-COLISIÓN (Logica Backend Mejorada)
-            Map<String, int[]> coords = new HashMap<>();
-            Set<String> occupied = new HashSet<>();
-
-            depths.entrySet().stream().sorted(Map.Entry.comparingByValue()).forEach(entry -> {
-                String id = entry.getKey();
-                int col = entry.getValue();
-                String laneId = nodeToLane.getOrDefault(id, laneOrder.isEmpty() ? "Lane_1" : laneOrder.get(0));
-                
-                while (occupied.contains(laneId + "_" + col)) { col++; }
-                occupied.add(laneId + "_" + col);
-
-                int laneIdx = Math.max(0, laneOrder.indexOf(laneId));
-                String type = nodeType.get(id);
-                int w = type.endsWith("Gateway") ? GW_SIZE : (type.contains("Event") ? EVT_SIZE : TASK_W);
-                int h = type.endsWith("Gateway") ? GW_SIZE : (type.contains("Event") ? EVT_SIZE : TASK_H);
-                
-                int x = FIRST_NODE_X + (col * NODE_X_STEP);
-                int y = POOL_Y + (laneIdx * LANE_HEIGHT) + (LANE_HEIGHT / 2) - (h / 2);
-                coords.put(id, new int[]{x, y, w, h});
-            });
-
-            StringBuilder di = new StringBuilder("\n  <bpmndi:BPMNDiagram id=\"BPMNDiagram_1\">\n");
-            di.append(String.format("    <bpmndi:BPMNPlane id=\"BPMNPlane_1\" bpmnElement=\"%s\">\n", collabId));
-            
-            int pW = FIRST_NODE_X + (occupied.size() + 2) * NODE_X_STEP;
-            int pH = Math.max(1, laneOrder.size()) * LANE_HEIGHT;
-            di.append(String.format("      <bpmndi:BPMNShape id=\"Participant_1_di\" bpmnElement=\"Participant_1\" isHorizontal=\"true\" isExpanded=\"true\"><dc:Bounds x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" /></bpmndi:BPMNShape>\n", POOL_X, POOL_Y, pW, pH));
-            
-            for (int i = 0; i < laneOrder.size(); i++) {
-                di.append(String.format("      <bpmndi:BPMNShape id=\"%s_di\" bpmnElement=\"%s\" isHorizontal=\"true\"><dc:Bounds x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" /></bpmndi:BPMNShape>\n", laneOrder.get(i), laneOrder.get(i), POOL_X + POOL_LABEL_W, POOL_Y + (i * LANE_HEIGHT), pW - POOL_LABEL_W, LANE_HEIGHT));
-            }
-
-            coords.forEach((id, c) -> di.append(String.format("      <bpmndi:BPMNShape id=\"%s_di\" bpmnElement=\"%s\"><dc:Bounds x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" /></bpmndi:BPMNShape>\n", id, id, c[0], c[1], c[2], c[3])));
-            
-            for (FlowInfo flow : seqFlows) {
-                int[] s = coords.get(flow.sourceRef), t = coords.get(flow.targetRef);
-                if (s != null && t != null) {
-                    di.append(String.format("      <bpmndi:BPMNEdge id=\"%s_di\" bpmnElement=\"%s\"><di:waypoint x=\"%d\" y=\"%d\" /><di:waypoint x=\"%d\" y=\"%d\" />", flow.id, flow.id, s[0] + s[2], s[1] + (s[3]/2), t[0], t[1] + (t[3]/2)));
-                    if (flow.name != null && !flow.name.isEmpty()) {
-                        di.append(String.format("<bpmndi:BPMNLabel><dc:Bounds x=\"%d\" y=\"%d\" width=\"30\" height=\"14\" /></bpmndi:BPMNLabel>", (s[0]+s[2]+t[0])/2, (s[1]+t[1])/2 - 15));
-                    }
-                    di.append("</bpmndi:BPMNEdge>\n");
-                }
-            }
-            di.append("    </bpmndi:BPMNPlane>\n  </bpmndi:BPMNDiagram>\n");
-
-            String finalXml = serializeDoc(doc).replace("</bpmn:definitions>", di.toString() + "</bpmn:definitions>");
-            if (!finalXml.contains("xmlns:bpmndi")) {
-                finalXml = finalXml.replace("<bpmn:definitions", "<bpmn:definitions xmlns:bpmndi=\"http://www.omg.org/spec/BPMN/20100524/DI\" xmlns:dc=\"http://www.omg.org/spec/DD/20100524/DC\" xmlns:di=\"http://www.omg.org/spec/DD/20100524/DI\" ");
-            }
-            return finalXml;
-        } catch (Exception e) {
-            log.error("Fallo Layout", e);
-            return semanticXml;
-        }
-    }
-
-    public String analyzeBottlenecks(String xmlBpmn) {
-        String systemPrompt = "Eres un Consultor Lean Six Sigma experto. Analiza el XML y genera 4 secciones: ## Cuellos de Botella, ## Tiempos, ## Puntos de Atasco, ## Recomendaciones.";
-        try { return callGroq("Analiza:\n" + xmlBpmn, systemPrompt); } catch (Exception e) { return "Error"; }
+    public String analyzeBottlenecks(String xmlUml) {
+        String systemPrompt = "Eres un Consultor Lean Six Sigma experto. Analiza el XML UML y genera 4 secciones: ## Cuellos de Botella, ## Tiempos, ## Puntos de Atasco, ## Recomendaciones.";
+        try { return callGroq("Analiza:\n" + xmlUml, systemPrompt); } catch (Exception e) { return "Error"; }
     }
 
     public String editBPMNXml(String xmlActual, String instruccion) {
-        String systemPrompt = "Eres un editor experto en BPMN 2.0. Aplica el cambio solicitado sin alterar IDs existentes. Devuelve el XML completo sin markdown.";
-        try { return injectDiagramBlock(repairSemanticXml(cleanXmlResponse(callGroq("XML:\n" + xmlActual + "\nInstrucción: " + instruccion, systemPrompt)))); } catch (Exception e) { return xmlActual; }
+        String systemPrompt = "Eres un arquitecto experto en UML 2.5. Aplica el cambio solicitado en el diagrama de actividades sin alterar IDs existentes. Devuelve el XML completo sin markdown.";
+        try { return repairSemanticXml(cleanXmlResponse(callGroq("XML:\n" + xmlActual + "\nInstrucción: " + instruccion, systemPrompt))); } catch (Exception e) { return xmlActual; }
     }
 
     private Document parseXml(String xml) throws Exception {
@@ -388,20 +269,65 @@ public class AIOrchestratorService {
 
     private String cleanXmlResponse(String raw) {
         if (raw == null) return "";
-        String c = raw.trim();
-        if (c.startsWith("```")) {
-            c = c.replaceFirst("```(xml)?\\s*", "");
-            int last = c.lastIndexOf("```");
-            if (last != -1) c = c.substring(0, last).trim();
+        String clean = raw.trim();
+        
+        // 1. Limpiar bloques de código markdown
+        if (clean.contains("```")) {
+            // Extraer lo que hay entre las primeras ``` y las últimas ```
+            int first = clean.indexOf("```");
+            int last = clean.lastIndexOf("```");
+            if (first != -1 && last > first) {
+                // Saltar la etiqueta del lenguaje (xml, json, etc)
+                String inside = clean.substring(first + 3, last);
+                if (inside.startsWith("xml")) inside = inside.substring(3);
+                if (inside.startsWith("json")) inside = inside.substring(4);
+                clean = inside.trim();
+            } else {
+                clean = clean.replaceAll("```[a-z]*", "").replaceAll("```", "").trim();
+            }
         }
-        return c;
+        
+        // 2. Si es XML (empieza con <), extraer solo el bloque XML
+        if (clean.startsWith("<")) {
+            int start = clean.indexOf("<");
+            int end = clean.lastIndexOf(">");
+            if (start != -1 && end > start) return clean.substring(start, end + 1);
+        }
+        
+        // 3. Si es JSON (empieza con { o [), devolver tal cual
+        return clean.trim();
     }
 
     private String callGroq(String userPrompt, String systemPrompt) throws Exception {
-        Map<String, Object> body = Map.of("model", MODEL, "messages", List.of(Map.of("role", "system", "content", systemPrompt), Map.of("role", "user", "content", userPrompt)), "temperature", 0.1);
-        String res = restClient.post().uri(GROQ_URL).header("Authorization", "Bearer " + apiKey).header("Content-Type", "application/json").body(body).retrieve().body(String.class);
-        return objectMapper.readTree(res).path("choices").get(0).path("message").path("content").asText().trim();
+        int maxRetries = 3;
+        int delay = 1000;
+        
+        for (int i = 0; i < maxRetries; i++) {
+            try {
+                Map<String, Object> body = Map.of(
+                    "model", MODEL, 
+                    "messages", List.of(
+                        Map.of("role", "system", "content", systemPrompt), 
+                        Map.of("role", "user", "content", userPrompt)
+                    ), 
+                    "temperature", 0.1
+                );
+                
+                String res = restClient.post()
+                        .uri(GROQ_URL)
+                        .header("Authorization", "Bearer " + apiKey)
+                        .header("Content-Type", "application/json")
+                        .body(body)
+                        .retrieve()
+                        .body(String.class);
+                        
+                return objectMapper.readTree(res).path("choices").get(0).path("message").path("content").asText().trim();
+            } catch (org.springframework.web.client.HttpClientErrorException.TooManyRequests e) {
+                log.warn("Rate limit alcanzado en Groq (429). Reintento {} de {} en {}ms", i + 1, maxRetries, delay);
+                Thread.sleep(delay);
+                delay *= 2; // Backoff exponencial
+            }
+        }
+        throw new RuntimeException("Error persistente 429 en Groq tras reintentos.");
     }
-
-    private record FlowInfo(String id, String sourceRef, String targetRef, String name) {}
 }

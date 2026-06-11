@@ -23,19 +23,17 @@ export class DepartmentManagerComponent implements OnInit {
   constructor(private bpmsService: BpmsService, private snackBar: MatSnackBar, private cdr: ChangeDetectorRef) {}
 
   ngOnInit() {
+    this.bpmsService.registrarAuditoria('ACCESO_MODULO', 'DEPARTAMENTOS', 'MAIN', 'Entró a gestión de departamentos').subscribe();
     this.cargarDepartamentos();
   }
 
   cargarDepartamentos() {
-    console.log('Intentando cargar departamentos desde el servidor...');
     this.bpmsService.listarDepartamentos().subscribe({
       next: data => {
-        console.log('Departamentos recibidos:', data);
         this.departamentos = data || [];
         this.cdr.detectChanges();
       },
       error: (err) => {
-        console.error('Error al listar departamentos:', err);
         this.snackBar.open('❌ Error de conexión con la base de datos', 'Cerrar', { 
           verticalPosition: 'bottom', horizontalPosition: 'center' 
         });
@@ -45,26 +43,15 @@ export class DepartmentManagerComponent implements OnInit {
 
   resincronizarTodo() {
     this.sincronizando = true;
-    this.snackBar.open('🔄 Refrescando diccionario de departamentos...', 'Cerrar', { 
-      duration: 2000, horizontalPosition: 'center', verticalPosition: 'bottom'
-    });
-    
-    // Llamamos a la sincronización del backend
     this.bpmsService.resincronizarDepartamentos().subscribe({
       next: () => {
         this.sincronizando = false;
         this.cargarDepartamentos();
         this.snackBar.open('✅ Diccionario actualizado', 'OK', { 
-          duration: 3000, panelClass: ['snack-success-premium'],
-          horizontalPosition: 'center', verticalPosition: 'bottom'
+          duration: 3000, horizontalPosition: 'center', verticalPosition: 'bottom'
         });
       },
-      error: (err) => {
-        this.sincronizando = false;
-        console.warn('El backend falló al resincronizar, pero intentamos cargar existentes...');
-        // Si el "resync" falla (carriles no procesados), igual cargamos lo que ya hay en la BD
-        this.cargarDepartamentos();
-      }
+      error: () => { this.sincronizando = false; this.cargarDepartamentos(); }
     });
   }
 
@@ -73,13 +60,14 @@ export class DepartmentManagerComponent implements OnInit {
       this.snackBar.open('⚠️ Por favor escribe un nombre oficial', 'OK', { duration: 2000 });
       return;
     }
+    const accion = dept.id ? 'RENOMBRAR_DEPARTAMENTO' : 'CREAR_DEPARTAMENTO';
     this.bpmsService.guardarDepartamento(dept).subscribe({
       next: () => {
+        this.bpmsService.registrarAuditoria(accion, 'DEPARTAMENTOS', dept.id || 'NUEVO', `Depto: ${dept.nombreOriginal}`).subscribe();
         this.snackBar.open('✅ Guardado correctamente', 'OK', { 
-          duration: 3000, panelClass: ['snack-success-premium'],
-          horizontalPosition: 'center', verticalPosition: 'bottom'
+          duration: 3000, horizontalPosition: 'center', verticalPosition: 'bottom'
         });
-        this.cargarDepartamentos(); // Recargamos para confirmar
+        this.cargarDepartamentos();
       },
       error: () => this.snackBar.open('❌ Error al guardar cambios', 'Cerrar', { duration: 3000 })
     });

@@ -48,13 +48,19 @@ public class FormularioController {
         
         // Obtener ramas de decisión para el prompt de la IA
         List<TareaInfo> tareas = politicaService.extraerTareasUsuario(politicaId);
-        List<String> opciones = tareas.stream()
+        TareaInfo estaTarea = tareas.stream()
                 .filter(t -> t.getId().equalsIgnoreCase(taskId))
-                .flatMap(t -> t.getRamas().stream())
+                .findFirst().orElse(null);
+
+        List<String> opciones = (estaTarea != null) ? estaTarea.getRamas().stream()
                 .map(TareaInfo.DecisionBranch::getCondicion)
-                .collect(java.util.stream.Collectors.toList());
+                .collect(java.util.stream.Collectors.toList()) : List.of();
 
         String schemaJson = formularioService.generateFormFields(taskName, "Tarea del proceso", "BPMS", opciones);
+        
+        // FUSIÓN ESTRUCTURAL: Asegurar que el enrutador esté presente y sea correcto
+        schemaJson = fuseDecisionLogic(schemaJson, estaTarea);
+
         Optional<FormularioSchema> exist = schemaRepository.findByPoliticaIdAndTaskDefinitionId(politicaId, taskId.toLowerCase());
         FormularioSchema schema = exist.orElse(new FormularioSchema());
         
@@ -79,6 +85,14 @@ public class FormularioController {
             @RequestParam(required = false) String taskName,
             @RequestBody String schemaJson) {
 
+        // FUSIÓN ESTRUCTURAL: Protegemos el enrutador también en el guardado manual
+        List<TareaInfo> tareas = politicaService.extraerTareasUsuario(politicaId);
+        TareaInfo estaTarea = tareas.stream()
+                .filter(t -> t.getId().equalsIgnoreCase(taskId))
+                .findFirst().orElse(null);
+        
+        schemaJson = fuseDecisionLogic(schemaJson, estaTarea);
+
         Optional<FormularioSchema> exist = schemaRepository.findByPoliticaIdAndTaskDefinitionId(politicaId, taskId.toLowerCase());
         FormularioSchema schema = exist.orElse(new FormularioSchema());
 
@@ -97,6 +111,47 @@ public class FormularioController {
 
         return ResponseEntity.ok(schemaRepository.save(schema));
     }
+
+    private String fuseDecisionLogic(String json, TareaInfo info) {
+        if (info == null || !info.isEsPuntoDecision() || info.getRamas() == null || info.getRamas().isEmpty()) {
+            return json;
+        }
+
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            List<Map<String, Object>> fields = mapper.readValue(json, new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, Object>>>() {});
+            
+            // Buscar si ya existe el decision_motor
+            Map<String, Object> decisionField = fields.stream()
+                    .filter(f -> "decision_motor".equals(f.get("id")))
+                    .findFirst().orElse(null);
+
+            List<String> opcionesBpm = info.getRamas().stream()
+                    .map(TareaInfo.DecisionBranch::getCondicion)
+                    .collect(java.util.stream.Collectors.toList());
+
+            if (decisionField == null) {
+                // Si no existe, lo inyectamos al final
+                decisionField = new java.util.HashMap<>();
+                decisionField.put("id", "decision_motor");
+                decisionField.put("label", "¿Hacia dónde continúa el trámite?");
+                decisionField.put("type", "select");
+                decisionField.put("required", true);
+                decisionField.put("options", opcionesBpm);
+                fields.add(decisionField);
+            } else {
+                // Si existe, actualizamos sus opciones para que coincidan con el BPMN actual
+                decisionField.put("type", "select"); // Forzar tipo
+                decisionField.put("required", true); // Forzar requerido
+                decisionField.put("options", opcionesBpm); // Sincronizar opciones
+            }
+
+            return mapper.writeValueAsString(fields);
+        } catch (Exception e) {
+            return json;
+        }
+    }
+
 
     @GetMapping("/politica/{id}/status")
     public ResponseEntity<Map<String, Object>> checkStatus(@PathVariable String id) {

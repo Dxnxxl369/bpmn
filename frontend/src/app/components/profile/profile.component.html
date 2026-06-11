@@ -1,1 +1,85 @@
-<p>profile works!</p>
+<div class="profile-container animate-fade-in">
+  <header class="profile-header">
+    <div class="badge-premium">IDENTIDAD DIGITAL</div>
+    <h1>Mi <span>Perfil</span></h1>
+    <p class="text-muted">Gestiona tu información y revisa tus áreas de responsabilidad.</p>
+  </header>
+
+  <div class="profile-grid">
+    <aside class="profile-sidebar glass-panel">
+      <div class="avatar-box">
+         <div class="avatar-ring clickable" (click)="triggerFile()">
+            <img [src]="avatarPreview || 'https://api.dicebear.com/7.x/avataaars/svg?seed=fallback'" alt="Avatar">
+            <div class="role-badge-float">{{ userRole }}</div>
+            <div class="avatar-overlay"><mat-icon>camera_alt</mat-icon></div>
+         </div>
+         <input type="file" #fileInput (change)="onFileSelected($event)" accept="image/*" style="display: none">
+         <h3>{{ currentName }}</h3>
+         <span class="email-text">{{ userEmail }}</span>
+
+         <div class="avatar-gallery-box">
+            <p class="box-title">O ELIGE UN AVATAR PREMIUM</p>
+            <div class="avatar-options scroll-custom-mini">
+               <div *ngFor="let av of predefinedAvatars" 
+                    class="av-opt" 
+                    [class.selected]="avatarPreview === av"
+                    (click)="selectAvatar(av)">
+                  <img [src]="av">
+               </div>
+            </div>
+         </div>
+      </div>
+
+      <div class="responsibilities-box">
+         <h4 class="box-title">AREAS DE RESPONSABILIDAD</h4>
+         <div class="dept-list scroll-custom-mini">
+            <div class="dept-item-pro" *ngFor="let dept of myDepartments">
+               <mat-icon>verified_user</mat-icon>
+               <div class="dept-info">
+                  <strong>{{ dept.nombreNormalizado }}</strong>
+                  <small>Acceso Total</small>
+               </div>
+            </div>
+            <div class="empty-msg" *ngIf="myDepartments.length === 0">
+               <mat-icon>info</mat-icon>
+               <p>No tienes departamentos asignados aún.</p>
+            </div>
+         </div>
+      </div>
+    </aside>
+
+    <main class="profile-main glass-panel">
+       <form [formGroup]="profileForm" (ngSubmit)="saveProfile()" class="main-form">
+          <h2 class="form-title"><mat-icon>settings</mat-icon> Datos Personales</h2>
+          <div class="form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Nombre</mat-label>
+              <input matInput formControlName="nombre">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Apellido</mat-label>
+              <input matInput formControlName="apellido">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Nombre de Usuario</mat-label>
+              <input matInput formControlName="username">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Email</mat-label>
+              <input matInput formControlName="email" readonly>
+            </mat-form-field>
+          </div>
+          
+          <div class="form-actions">
+            <button type="button" class="btn-cancel-pro" (click)="resetForm()">
+                <mat-icon>restart_alt</mat-icon> DESHACER
+            </button>
+            <button type="submit" class="btn-save-pro">
+                <mat-icon>{{ saving ? 'sync' : 'save' }}</mat-icon>
+                {{ saving ? 'GUARDANDO...' : 'GUARDAR CAMBIOS' }}
+            </button>
+          </div>
+       </form>
+    </main>
+  </div>
+</div>

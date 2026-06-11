@@ -8,6 +8,8 @@ import { ExecutiveCastingComponent } from './modules/executives/executive-castin
 import { ProcessMonitorComponent } from './modules/monitor/process-monitor/process-monitor.component';
 import { ProfileComponent } from './components/profile/profile.component';
 import { GlobalAnalyticsComponent } from './components/global-analytics/global-analytics.component';
+import { BitacoraAuditoriaComponent } from './components/bitacora-auditoria/bitacora-auditoria.component';
+import { ReportesDinamicosComponent } from './components/reportes-dinamicos/reportes-dinamicos.component';
 
 import { PortalShellComponent } from './modules/portal/portal-shell/portal-shell.component';
 import { PortalCatalogComponent } from './modules/portal/portal-catalog/portal-catalog.component';
@@ -37,6 +39,8 @@ export const routes: Routes = [
       { path: 'executives', component: ExecutiveCastingComponent },
       { path: 'monitor', component: ProcessMonitorComponent },
       { path: 'reports', component: GlobalAnalyticsComponent },
+      { path: 'reportes-ia', component: ReportesDinamicosComponent },
+      { path: 'bitacora', component: BitacoraAuditoriaComponent },
       { path: 'profile', component: ProfileComponent },
       { path: 'monitor-ejecutivo', component: FuncionarioMonitorComponent }
     ]

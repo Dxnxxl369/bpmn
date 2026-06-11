@@ -18,6 +18,10 @@ public class InstanciaProceso {
     private Instant fechaFin;
     private String macroprocesoId;
     private String contextoJson; // Aquí viajan el Nombre, CI, Teléfono, etc.
+    private String clienteCi; // Identificador maestro para el repositorio documental
+    
+    // Observaciones específicas por campo (para campos que no son archivos)
+    private java.util.Map<String, String> observacionesCampos = new java.util.HashMap<>();
     
     // Seguimiento para el cliente
     private String codigoSeguimiento;
@@ -45,8 +49,13 @@ public class InstanciaProceso {
     public void setMacroprocesoId(String macroprocesoId) { this.macroprocesoId = macroprocesoId; }
     public String getContextoJson() { return contextoJson; }
     public void setContextoJson(String contextoJson) { this.contextoJson = contextoJson; }
+    public String getClienteCi() { return clienteCi; }
+    public void setClienteCi(String clienteCi) { this.clienteCi = clienteCi; }
     public String getCodigoSeguimiento() { return codigoSeguimiento; }
     public void setCodigoSeguimiento(String codigoSeguimiento) { this.codigoSeguimiento = codigoSeguimiento; }
     public String getResultadoFinal() { return resultadoFinal; }
     public void setResultadoFinal(String resultadoFinal) { this.resultadoFinal = resultadoFinal; }
+
+    public java.util.Map<String, String> getObservacionesCampos() { return observacionesCampos; }
+    public void setObservacionesCampos(java.util.Map<String, String> observacionesCampos) { this.observacionesCampos = observacionesCampos; }
 }

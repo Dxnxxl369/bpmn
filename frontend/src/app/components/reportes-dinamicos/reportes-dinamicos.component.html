@@ -1,0 +1,161 @@
+<div class="report-container animate-fade-in">
+    <!-- CAPA 1: RIBBON SUPERIOR (FIJO) -->
+    <header class="ribbon-header">
+        <div class="logo-area">
+            <mat-icon class="icon-orb-mini">assessment</mat-icon>
+            <h1>Reportes <span style="color:var(--primary-color)">BI</span></h1>
+        </div>
+
+        <div class="search-ia-slim">
+            <mat-icon [class.spinning]="isProcessing">psychology</mat-icon>
+            <input type="text" [(ngModel)]="prompt" (keyup.enter)="generarReporteIA()" placeholder="¿Quiénes son de CINE? o ¿Quién hizo más tareas?">
+            <button class="icon-btn" (click)="toggleListening()" [class.listening]="isListening">
+                <mat-icon>{{ isListening ? 'mic' : 'mic_none' }}</mat-icon>
+            </button>
+            <button class="icon-btn send" (click)="generarReporteIA()" [disabled]="isProcessing || !prompt">
+                <mat-icon>send</mat-icon>
+            </button>
+        </div>
+
+        <div class="header-actions">
+            <div class="export-minis">
+                <button class="btn-mini pdf" (click)="exportar('pdf')">PDF</button>
+                <button class="btn-mini xlsx" (click)="exportar('xlsx')">EXCEL</button>
+            </div>
+            <div class="v-separator"></div>
+            <button class="icon-btn debug" (click)="showDebug = !showDebug" [class.active]="showDebug">
+                <mat-icon>code</mat-icon>
+            </button>
+        </div>
+    </header>
+
+    <!-- CAPA 2: BARRA DE HERRAMIENTAS DESPLEGABLE -->
+    <div class="sub-ribbon">
+        <!-- BOTONES DE ACTIVACIÓN -->
+        <div class="ribbon-toggles">
+            <button class="toggle-btn" (click)="showManualFilters = !showManualFilters" [class.active]="showManualFilters">
+                <mat-icon>filter_alt</mat-icon> FILTROS MANUALES
+            </button>
+            <button class="toggle-btn" (click)="showVisibilityMenu = !showVisibilityMenu" [class.active]="showVisibilityMenu">
+                <mat-icon>visibility</mat-icon> VISIBILIDAD
+            </button>
+        </div>
+
+        <!-- PANEL DE FILTROS (COLLAPSIBLE) -->
+        <div class="collapsible-panel filters" *ngIf="showManualFilters">
+            <div class="filter-group">
+                <label>Depto</label>
+                <select class="slim-select" [(ngModel)]="manualFilters.departamento">
+                    <option value="">Todos</option>
+                    <option *ngFor="let d of departamentos" [value]="d.nombreOriginal">{{ d.nombreOriginal }}</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Usuario / Rol</label>
+                <div class="h-row">
+                    <select class="slim-select" [(ngModel)]="manualFilters.usuarioId">
+                        <option value="">Usuarios</option>
+                        <option *ngFor="let u of usuarios" [value]="u.id">{{ u.nombre }} {{ u.apellido }}</option>
+                    </select>
+                    <select class="slim-select" [(ngModel)]="manualFilters.rol">
+                        <option value="">Roles</option>
+                        <option *ngFor="let r of roles" [value]="r">{{ r }}</option>
+                    </select>
+                </div>
+            </div>
+            <div class="filter-group">
+                <label>Fecha / Hora</label>
+                <div class="h-row">
+                    <input type="date" class="slim-input" [(ngModel)]="manualFilters.fechaInicio">
+                    <input type="time" class="slim-input" [(ngModel)]="manualFilters.horaInicio">
+                </div>
+            </div>
+            <button class="btn-execute" (click)="aplicarFiltrosManuales()">APLICAR</button>
+        </div>
+
+        <!-- PANEL DE VISIBILIDAD (COLLAPSIBLE) -->
+        <div class="collapsible-panel visibility" *ngIf="showVisibilityMenu">
+            <span class="panel-label">COLUMNAS ACTIVAS:</span>
+            <div class="chip-container">
+                <div class="col-chip-mini" *ngFor="let col of allColumns" 
+                     [class.active]="displayedColumns.includes(col.id)"
+                     (click)="toggleColumn(col.id)">
+                    {{ col.label }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI SUMMARY BAR (COMPACTA) -->
+    <div class="bi-status-bar" *ngIf="summaryIA || totalFound > 0">
+        <div class="status-item"><mat-icon>analytics</mat-icon> <span>{{ summaryIA }}</span></div>
+        <div class="status-item"><mat-icon>groups</mat-icon> <span>RESULTADOS: <b>{{ totalFound }}</b></span></div>
+        <div class="status-item"><mat-icon>storage</mat-icon> <span>TIPO: <b>{{ targetType }}</b></span></div>
+    </div>
+
+    <!-- PANEL DEBUG -->
+    <div class="debug-overlay" *ngIf="showDebug && debugIA">
+        <div class="debug-header"><span>QUERY PLAN JSON</span><mat-icon (click)="showDebug = false">close</mat-icon></div>
+        <pre>{{ debugIA }}</pre>
+    </div>
+
+    <!-- LIENZO DE DATOS MAXIMIZADO -->
+    <div class="results-area-compact">
+        <div class="loading-overlay" *ngIf="isProcessing"><div class="loader"></div></div>
+        
+        <div class="table-wrapper scroll-custom">
+            <table mat-table [dataSource]="results" class="mat-elevation-z8" *ngIf="results.length > 0">
+                <ng-container matColumnDef="fecha">
+                    <th mat-header-cell *matHeaderCellDef [style.width]="getColumnWidth('fecha')">
+                        <div class="resizer-box"><span>FECHA</span><div class="resizer" (mousedown)="onResizeColumn($event, 'fecha')"></div></div>
+                    </th>
+                    <td mat-cell *matCellDef="let log"> {{ log.fecha }} </td>
+                </ng-container>
+                <ng-container matColumnDef="hora">
+                    <th mat-header-cell *matHeaderCellDef [style.width]="getColumnWidth('hora')">
+                        <div class="resizer-box"><span>HORA</span><div class="resizer" (mousedown)="onResizeColumn($event, 'hora')"></div></div>
+                    </th>
+                    <td mat-cell *matCellDef="let log"> {{ log.hora }} </td>
+                </ng-container>
+                <ng-container matColumnDef="usuarioNombre">
+                    <th mat-header-cell *matHeaderCellDef [style.width]="getColumnWidth('usuarioNombre')">
+                        <div class="resizer-box"><span>ITEM</span><div class="resizer" (mousedown)="onResizeColumn($event, 'usuarioNombre')"></div></div>
+                    </th>
+                    <td mat-cell *matCellDef="let log"> {{ log.usuarioNombre }} </td>
+                </ng-container>
+                <ng-container matColumnDef="rol">
+                    <th mat-header-cell *matHeaderCellDef [style.width]="getColumnWidth('rol')">
+                        <div class="resizer-box"><span>ROL</span><div class="resizer" (mousedown)="onResizeColumn($event, 'rol')"></div></div>
+                    </th>
+                    <td mat-cell *matCellDef="let log"><span class="tag-rol-mini">{{ log.rol }}</span></td>
+                </ng-container>
+                <ng-container matColumnDef="departamento">
+                    <th mat-header-cell *matHeaderCellDef [style.width]="getColumnWidth('departamento')">
+                        <div class="resizer-box"><span>DEPTO</span><div class="resizer" (mousedown)="onResizeColumn($event, 'departamento')"></div></div>
+                    </th>
+                    <td mat-cell *matCellDef="let log"> {{ log.departamento }} </td>
+                </ng-container>
+                <ng-container matColumnDef="email">
+                    <th mat-header-cell *matHeaderCellDef [style.width]="getColumnWidth('email')">
+                        <div class="resizer-box"><span>EMAIL</span><div class="resizer" (mousedown)="onResizeColumn($event, 'email')"></div></div>
+                    </th>
+                    <td mat-cell *matCellDef="let log"> {{ log.email }} </td>
+                </ng-container>
+                <ng-container matColumnDef="cantidad">
+                    <th mat-header-cell *matHeaderCellDef [style.width]="getColumnWidth('cantidad')">
+                        <div class="resizer-box"><span>CANT</span><div class="resizer" (mousedown)="onResizeColumn($event, 'cantidad')"></div></div>
+                    </th>
+                    <td mat-cell *matCellDef="let log"><b>{{ log.cantidad || '-' }}</b></td>
+                </ng-container>
+
+                <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+                <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+            </table>
+
+            <div class="empty-state-compact" *ngIf="results.length === 0 && !isProcessing">
+                <mat-icon>search_off</mat-icon>
+                <p>Sin resultados. Ajusta los filtros o pregunta a la IA.</p>
+            </div>
+        </div>
+    </div>
+</div>

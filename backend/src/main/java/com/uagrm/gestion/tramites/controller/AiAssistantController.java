@@ -24,4 +24,11 @@ public class AiAssistantController {
         String respuesta = assistantService.consultarIA(pregunta, modo, contexto, manual, estilo);
         return Map.of("respuesta", respuesta);
     }
+
+    @PostMapping("/redactar-base")
+    public String redactarBase(@RequestBody Map<String, Object> payload) {
+        String prompt = (String) payload.get("prompt");
+        Map<String, Object> contexto = (Map<String, Object>) payload.get("contexto");
+        return assistantService.generarBorradorDocumento(prompt, contexto);
+    }
 }

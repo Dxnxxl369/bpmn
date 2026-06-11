@@ -1,0 +1,114 @@
+<div class="editor-panel animate-fade-in">
+    <!-- BLOQUE 1: CABECERA Y HERRAMIENTAS (FIJO) -->
+    <div class="editor-top-controls">
+        <div class="capsule-mode-banner animate-fade-down" *ngIf="isCapsuleMode">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <mat-icon>history</mat-icon>
+                ESTÁ VIENDO UNA VERSIÓN ANTIGUA (SOLO LECTURA)
+            </div>
+            <button (click)="restoreVersion()">RESTAURAR ESTA VERSIÓN</button>
+        </div>
+
+        <header class="editor-header">
+            <div class="header-title">
+                <h1>Documento de Gestión</h1>
+                <span>{{ selectedDocument?.nombreArchivo || 'Nuevo Documento' }} • V{{ selectedDocument?.version || 1 }}</span>
+            </div>
+            
+            <div class="collaborators-box">
+                <div class="avatar-group">
+                    <div class="avatar-wrapper" *ngFor="let c of collaborators">
+                        <div class="avatar other" [style.background-image]="c.avatar ? 'url(' + c.avatar + ')' : 'none'">
+                            {{ !c.avatar ? c.name.charAt(0) : '' }}
+                        </div>
+                    </div>
+                    <div class="avatar-wrapper">
+                        <div class="avatar me" [style.background-image]="me?.avatar ? 'url(' + me.avatar + ')' : 'none'">
+                            {{ !me?.avatar ? 'TÚ' : '' }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tool-separator"></div>
+                
+                <button class="btn-version" (click)="toggleVersions()">
+                    <mat-icon>history</mat-icon> <span>HISTORIAL</span>
+                </button>
+                <button class="btn-cancel-mini" (click)="cancelled.emit()" matTooltip="Cerrar Editor">
+                    <mat-icon>close</mat-icon>
+                </button>
+            </div>
+        </header>
+
+        <div class="toolbar" [class.disabled]="isCapsuleMode">
+            <div class="tool-group">
+                <button class="tool-btn" [class.active-ia]="showIaActions" (click)="showIaActions = !showIaActions" matTooltip="Opciones IA">
+                    <mat-icon>auto_awesome</mat-icon>
+                </button>
+            </div>
+
+            <!-- MENÚ IA COLAPSABLE -->
+            <div class="ia-actions-container" [class.expanded]="showIaActions">
+                <div class="ia-input-wrapper">
+                    <mat-icon [class.spinning]="isDraftingIA" style="color:#d35400">psychology</mat-icon>
+                    <input type="text" [(ngModel)]="iaPrompt" (keyup.enter)="generarBorradorIA()" placeholder="Dime qué redactar...">
+                    <button class="tool-btn" (click)="generarBorradorIA()" [disabled]="isDraftingIA || !iaPrompt">
+                        <mat-icon>send</mat-icon>
+                    </button>
+                </div>
+                <button class="btn-ia-action btn-ia-magic" (click)="autoRellenar()" [disabled]="isCapsuleMode">
+                    <mat-icon>magic_button</mat-icon> AUTO-RELLENAR
+                </button>
+                <button class="btn-ia-action btn-ia-save" (click)="generarDocumento()" [disabled]="isGenerating || isCapsuleMode">
+                    <mat-icon>{{ isGenerating ? 'sync' : 'save' }}</mat-icon> {{ isGenerating ? 'GUARDANDO...' : 'GUARDAR' }}
+                </button>
+            </div>
+
+            <div class="tool-separator"></div>
+            
+            <div class="tool-group">
+                <button class="tool-btn" (click)="execCommand('bold')"><mat-icon>format_bold</mat-icon></button>
+                <button class="tool-btn" (click)="execCommand('italic')"><mat-icon>format_italic</mat-icon></button>
+                <button class="tool-btn" (click)="execCommand('underline')"><mat-icon>format_underlined</mat-icon></button>
+            </div>
+
+            <div class="tool-separator"></div>
+
+            <div class="tool-group">
+                <button class="tool-btn" (click)="execCommand('justifyLeft')"><mat-icon>format_align_left</mat-icon></button>
+                <button class="tool-btn" (click)="execCommand('justifyCenter')"><mat-icon>format_align_center</mat-icon></button>
+                <button class="tool-btn" (click)="execCommand('justifyRight')"><mat-icon>format_align_right</mat-icon></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- BLOQUE 2: LIENZO DE REDACCIÓN -->
+    <div class="editor-main-body scroll-custom" (mousemove)="!isCapsuleMode && onMouseMove($event)">
+        <div class="document-paper" [class.readonly]="isCapsuleMode">
+            <ng-container *ngFor="let cursor of remoteCursors | keyvalue">
+                <div class="remote-cursor" [style.left.px]="cursor.value.x" [style.top.px]="cursor.value.y" *ngIf="!isCapsuleMode">
+                    <div class="cursor-pointer"></div>
+                    <div class="cursor-name">{{ cursor.value.name }}</div>
+                </div>
+            </ng-container>
+            <div class="doc-body" [attr.contenteditable]="!isCapsuleMode" #docBody [innerHTML]="content" (input)="!isCapsuleMode && onContentInput($event)"></div>
+        </div>
+    </div>
+
+    <!-- SIDEBAR DE VERSIONES -->
+    <div class="version-sidebar animate-fade-left" *ngIf="showVersionsSidebar">
+        <div class="vs-header">
+            <h3>Historial de Cambios</h3>
+            <mat-icon (click)="toggleVersions()" style="cursor:pointer">close</mat-icon>
+        </div>
+        <div class="vs-list scroll-custom-mini">
+            <div class="vs-item" *ngFor="let v of versiones" [class.active]="v.id === viewingVersion?.id" (click)="viewVersion(v)">
+                <div class="vs-badge" [class.current]="v.esActual">V{{ v.version }}</div>
+                <div class="vs-info">
+                    <div class="vs-top">{{ v.funcionarioNombre }}</div>
+                    <div class="vs-bot">{{ v.fechaSubida | date:'shortTime' }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

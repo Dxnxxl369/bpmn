@@ -59,6 +59,23 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
             </div>
           </div>
 
+          <!-- ENTREGABLES OFICIALES (FASE FINAL) -->
+          <div class="official-deliverables" *ngIf="data.oficiales && data.oficiales.length > 0">
+              <h4>Entregables Oficiales</h4>
+              <div class="deliverable-item card-gold" *ngFor="let doc of data.oficiales">
+                  <div class="item-info">
+                      <mat-icon>verified</mat-icon>
+                      <div>
+                          <strong>{{ doc.nombreArchivo }}</strong>
+                          <p>{{ doc.tipoDocumento }} - VersiÃ³n {{ doc.version }}</p>
+                      </div>
+                  </div>
+                  <a [href]="doc.urlS3" target="_blank" mat-flat-button color="accent" class="btn-download">
+                      <mat-icon>download</mat-icon> DESCARGAR
+                  </a>
+              </div>
+          </div>
+
           <div class="activity-log">
             <h4>Actividad Reciente</h4>
             <div class="log-item" *ngFor="let t of data.tareas">
@@ -71,6 +88,24 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
               <span class="log-status">{{ t.estado }}</span>
             </div>
           </div>
+
+          <!-- OBSERVACIONES DE DOCUMENTOS (FASE 4) -->
+          <div class="document-alerts" *ngIf="data.documentos && data.documentos.length > 0">
+              <ng-container *ngFor="let doc of data.documentos">
+                  <div class="doc-alert-item" [ngClass]="doc.estado.toLowerCase()" *ngIf="doc.estado === 'OBSERVADO'">
+                      <div class="alert-head">
+                          <mat-icon>warning</mat-icon>
+                          <strong>DOCUMENTO OBSERVADO: {{ doc.tipo }}</strong>
+                      </div>
+                      <p class="alert-motive">"{{ doc.motivo }}"</p>
+                      <button mat-flat-button class="btn-fix" routerLink="/portal" 
+                              [queryParams]="{ci: data.instancia.clienteCi, fix: data.instancia.politicaNegocioId}">
+                          SOLUCIONAR OBSERVACIONES
+                      </button>
+                  </div>
+              </ng-container>
+          </div>
+
         </div>
 
         <div class="error-state" *ngIf="!data && !loading">
@@ -122,6 +157,18 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
     .info-item p { margin: 0; font-weight: 800; color: var(--text-main); }
 
     .activity-log h4 { margin-bottom: 20px; color: var(--text-main); font-weight: 800; }
+    
+    /* ENTREGABLES OFICIALES */
+    .official-deliverables { margin-bottom: 40px; padding: 30px; background: rgba(241, 196, 15, 0.05); border: 2px solid #f1c40f; border-radius: 30px; }
+    .official-deliverables h4 { color: #f1c40f; font-weight: 900; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
+    .deliverable-item { display: flex; align-items: center; justify-content: space-between; padding: 15px 0; border-bottom: 1px solid rgba(241, 196, 15, 0.1); }
+    .deliverable-item:last-child { border: none; }
+    .item-info { display: flex; align-items: center; gap: 15px; }
+    .item-info mat-icon { color: #f1c40f; }
+    .item-info strong { display: block; color: var(--text-main); }
+    .item-info p { margin: 0; font-size: 0.75rem; color: var(--text-muted); }
+    .btn-download { font-weight: 800; border-radius: 12px; }
+
     .log-item { display: flex; align-items: center; gap: 20px; padding: 15px 0; border-bottom: 1px solid var(--glass-border); }
     .log-dot { width: 10px; height: 10px; border-radius: 50%; }
     .log-dot.COMPLETADA { background: #27ae60; }
@@ -133,6 +180,26 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 
     .error-state { padding: 60px; text-align: center; }
     .error-state mat-icon { font-size: 60px; width: 60px; height: 60px; color: #e74c3c; margin-bottom: 20px; }
+
+    /* ALERTAS DE DOCUMENTOS OBSERVADOS */
+    .document-alerts { margin-top: 40px; }
+    .doc-alert-item { 
+        background: rgba(239, 68, 68, 0.05); 
+        border: 2px solid #ef4444; 
+        border-radius: 20px; 
+        padding: 25px; 
+        margin-bottom: 20px; 
+        animation: shake 0.5s;
+    }
+    .alert-head { display: flex; align-items: center; gap: 10px; color: #ef4444; margin-bottom: 10px; }
+    .alert-motive { font-style: italic; color: var(--text-main); margin-bottom: 20px; font-weight: 500; }
+    .btn-fix { background: #ef4444 !important; color: white !important; font-weight: 900; border-radius: 12px; width: 100%; }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-5px); }
+      75% { transform: translateX(5px); }
+    }
   `]
 })
 export class PortalTrackingComponent implements OnInit {
@@ -149,7 +216,7 @@ export class PortalTrackingComponent implements OnInit {
   }
 
   cargarSeguimiento() {
-    this.http.get<any>(`http://13.217.197.171:8080/api/public/seguimiento/${this.token}`).subscribe({
+    this.http.get<any>(`http://localhost:8080/api/public/seguimiento/${this.token}`).subscribe({
       next: (res) => {
         this.data = res;
         this.loading = false;
